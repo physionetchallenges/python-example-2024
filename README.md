@@ -2,11 +2,9 @@
 
 ## What's in this repository?
 
-This repository contains a simple example that illustrates how to format a Python entry for the George B. Moody PhysioNet Challenge 2024. We recommend that you use this repository as a template for your entry. You can remove some of the code, reuse other code, and add new code to create your entry. You do not need to use the models, features, and/or libraries in this example for your approach. We encourage a diversity of approaches for the Challenge.
+This repository contains a simple example that illustrates how to format a Python entry for the [George B. Moody PhysioNet Challenge 2024](https://physionetchallenges/2024/). If you are participating in the 2024 Challenge, then we recommend using repository as a template for your entry. You can remove some of the code, reuse other code, and add new code to create your entry. You do not need to use the models, features, and/or libraries in this example for your entry. We encourage a diversity of approaches for the Challenge.
 
-For this example, we implemented a random forest model with several features. This simple example is designed **not** not to perform well, so you should **not** use it as a baseline for your model's performance. You can try it by running the following commands on the Challenge training set. These commands should take a few minutes or less to run from start to finish on a recent personal computer.
-
-This code uses four main scripts, described below, to train and run a model for the Challenge.
+For this example, we implemented a random forest model with several features. This simple example is **not** designed to perform well, so you should **not** use it as a baseline for your model's performance. You can try it by running the following commands on the Challenge training set. If you are using a relatively recent personal computer, then you should be able to run these commands from start to finish on a small subset (1000 records) on the training data in less than 20 minutes.
 
 ## How do I run these scripts?
 
@@ -22,7 +20,7 @@ You can train your model by running
 
 where
 
-- `training_data` (input; required) is a folder with the training data files, including the images and diagnoses (you can use the `records100` folder from the below steps); and
+- `training_data` (input; required) is a folder with the training data files, including the images and diagnoses (you can use the `ptb-xl/records100/00000` folder from the below steps); and
 - `model` (output; required) is a folder for saving your model.
 
 You can run your trained model by running
@@ -31,7 +29,7 @@ You can run your trained model by running
 
 where
 
-- `test_data` (input; required) is a folder with the validation or test data files, excluding the images and diagnoses (you can use the `records100_no_waveforms_diagnoses` folder from the below steps);
+- `test_data` (input; required) is a folder with the validation or test data files, excluding the images and diagnoses (you can use the `ptb-xl/records100_no_waveforms_diagnoses/00000` folder from the below steps);
 - `model` (input; required) is a folder for loading your model; and
 - `test_outputs` is a folder for saving your model outputs.
 
@@ -43,43 +41,43 @@ You can evaluate your model by pulling or downloading the [evaluation code](http
 
 where
 
-- `labels` is a folder with labels for the data, such as the training database on the PhysioNet webpage (you can use the `records100` folder from the below steps);
+- `labels` is a folder with labels for the data, such as the training database on the PhysioNet webpage (you can use the `ptb-xl/records100/00000` folder from the below steps);
 - `test_outputs` is a folder containing files with your model's outputs for the data; and
 - `scores.csv` (optional) is file with a collection of scores for your model.
 
 ## How do I create data for these scripts?
 
-You can use the scripts in this repository to generate synthetic ECG images for the [PTB-XL dataset](https://www.nature.com/articles/s41597-020-0495-6).
+You can use the scripts in this repository to generate synthetic ECG images for the [PTB-XL dataset](https://www.nature.com/articles/s41597-020-0495-6). You will need to generate or otherwise obtain ECG images before running the above steps.
 
-1. Download (and unzip) the [PTB-XL dataset](https://physionet.org/content/ptb-xl/). We will use `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3` as the folder name that contains the data for these commands, but you can replace it with the path on your machine.
+1. Download (and unzip) the [PTB-XL dataset](https://physionet.org/content/ptb-xl/). We will use `ptb-xl` as the folder name that contains the data for these commands (the full folder name is currently  `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3`), but you can replace it with the absolute or relative path on your machine.
 
 2. Add information from various spreadsheets from the dataset to the WFDB header files:
 
         python prepare_ptbxl_data.py \
-            -i ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100 \
-            -d ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/ptbxl_database.csv \
-            -s ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/scp_statements.csv \
-            -o ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100
+            -i ptb-xl/records100/00000 \
+            -d ptb-xl/ptbxl_database.csv \
+            -s ptb-xl/scp_statements.csv \
+            -o ptb-xl/records100/00000
 
 3. [Generate synthetic ECG images](https://github.com/alphanumericslab/ecg-image-kit/tree/main/codes/ecg-image-generator) on the dataset:
 
         python gen_ecg_images_from_data_batch.py \
-            -i ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100 \
-            -o ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100 \
+            -i ptb-xl/records100/00000 \
+            -o ptb-xl/records100/00000 \
             -se 12345
 
 4. Add the file locations for the synthetic ECG images. You can use this folder for the `train_model` step:
 
         python add_image_filenames.py \
-            -i ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100 \
-            -o ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100
+            -i ptb-xl/records100/00000 \
+            -o ptb-xl/records100/00000
 
 5. Remove the waveforms, certain information about the waveforms, and the demographics and diagnoses to create a version of the data for inference. You can use this folder for the `run_model` step:
 
         python remove_waveforms.py \
-            -i ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100 \
+            -i ptb-xl/records100/00000 \
             -d \
-            -o ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100_no_waveforms_diagnoses
+            -o ptb-xl/records100_no_waveforms_diagnoses/00000
 
 ## Which scripts I can edit?
 
@@ -141,11 +139,11 @@ If you have trouble running your code, then please try the follow steps to run t
             Dockerfile             README.md         test_outputs
             evaluate_model.py      requirements.txt  training_data
             helper_code.py         team_code.py      train_model.py
-            LICENSE                run_model.py
+            LICENSE                run_model.py      [...]
 
-        root@[...]:/challenge# python train_model.py -d training_data -m model
+        root@[...]:/challenge# python train_model.py -d training_data -m model -v
 
-        root@[...]:/challenge# python run_model.py -d test_data -m model -o test_outputs
+        root@[...]:/challenge# python run_model.py -d test_data -m model -o test_outputs -v
 
         root@[...]:/challenge# python evaluate_model.py -d test_data -o test_outputs
         [...]
@@ -157,11 +155,9 @@ If you have trouble running your code, then please try the follow steps to run t
 
 This repository does not include code for evaluating your entry. Please see the [evaluation code repository](https://github.com/physionetchallenges/evaluation-2024) for code and instructions for evaluating your entry using the Challenge scoring metric.
 
-This repository also includes code for preparing the validation and test sets. We will write more here.
+## How do I learn more? How do I share more?
 
-## How do I learn more?
-
-Please see the [Challenge website](https://physionetchallenges.org/2024/) for more details. Please post questions and concerns on the [Challenge discussion forum](https://groups.google.com/forum/#!forum/physionet-challenges).
+Please see the [Challenge website](https://physionetchallenges.org/2024/) for more details. Please post questions and concerns on the [Challenge discussion forum](https://groups.google.com/forum/#!forum/physionet-challenges). Please do not make pull requests, which may share information about your approach.
 
 ## Useful links
 
