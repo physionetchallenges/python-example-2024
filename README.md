@@ -2,7 +2,7 @@
 
 ## What's in this repository?
 
-This repository contains a simple example that illustrates how to format a Python entry for the [George B. Moody PhysioNet Challenge 2024](https://physionetchallenges/2024/). If you are participating in the 2024 Challenge, then we recommend using repository as a template for your entry. You can remove some of the code, reuse other code, and add new code to create your entry. You do not need to use the models, features, and/or libraries in this example for your entry. We encourage a diversity of approaches for the Challenge.
+This repository contains a simple example that illustrates how to format a Python entry for the [George B. Moody PhysioNet Challenge 2024](https://moody-challenge.physionet.org/2024/). If you are participating in the 2024 Challenge, then we recommend using repository as a template for your entry. You can remove some of the code, reuse other code, and add new code to create your entry. You do not need to use the models, features, and/or libraries in this example for your entry. We encourage a diversity of approaches for the Challenge.
 
 For this example, we implemented a random forest model with several features. This simple example is **not** designed to perform well, so you should **not** use it as a baseline for your model's performance. You can try it by running the following commands on the Challenge training set. If you are using a relatively recent personal computer, then you should be able to run these commands from start to finish on a small subset (1000 records) on the training data in less than 20 minutes.
 
