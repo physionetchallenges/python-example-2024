@@ -2,35 +2,35 @@
 
 ## What's in this repository?
 
-This repository contains a simple example that illustrates how to format a Python entry for the [George B. Moody PhysioNet Challenge 2024](https://physionetchallenges/2024/). If you are participating in the 2024 Challenge, then we recommend using repository as a template for your entry. You can remove some of the code, reuse other code, and add new code to create your entry. You do not need to use the models, features, and/or libraries in this example for your entry. We encourage a diversity of approaches for the Challenge.
+This repository contains a simple example that illustrates how to format a Python entry for the [George B. Moody PhysioNet Challenge 2024](https://physionetchallenges.org/2024/). If you are participating in the 2024 Challenge, then we recommend using this repository as a template for your entry. You can remove some of the code, reuse other code, and add new code to create your entry. You do not need to use the models, features, and/or libraries in this example for your entry. We encourage a diversity of approaches for the Challenges.
 
-For this example, we implemented a random forest model with several features. This simple example is **not** designed to perform well, so you should **not** use it as a baseline for your model's performance. You can try it by running the following commands on the Challenge training set. If you are using a relatively recent personal computer, then you should be able to run these commands from start to finish on a small subset (1000 records) on the training data in less than 20 minutes.
+For this example, we implemented a random forest model with several simple features. (This simple example is **not** designed to perform well, so you should **not** use it as a baseline for your approach's performance.) You can try it by running the following commands on the Challenge training set. If you are using a relatively recent personal computer, then you should be able to run these commands from start to finish on a small subset (1000 records) of the training data in less than 30 minutes.
 
 ## How do I run these scripts?
 
-First, you can download and create data by following instructions in the following section.
+First, you can download and create data for these scripts by following instructions in the following section.
 
-Second, you can install the dependencies for these scripts by creating a Docker image (see below) and running
+Second, you can install the dependencies for these scripts by creating a Docker image (see below) or [virtual environment](https://docs.python.org/3/library/venv.html) and running
 
     pip install -r requirements.txt
 
-You can train your model by running
+You can train your model(s) by running
 
     python train_model.py -d training_data -m model
 
 where
 
 - `training_data` (input; required) is a folder with the training data files, including the images and diagnoses (you can use the `ptb-xl/records100/00000` folder from the below steps); and
-- `model` (output; required) is a folder for saving your model.
+- `model` (output; required) is a folder for saving your model(s).
 
-You can run your trained model by running
+You can run your trained model(s) by running
 
     python run_model.py -d test_data -m model -o test_outputs
 
 where
 
 - `test_data` (input; required) is a folder with the validation or test data files, excluding the images and diagnoses (you can use the `ptb-xl/records100_no_waveforms_diagnoses/00000` folder from the below steps);
-- `model` (input; required) is a folder for loading your model; and
+- `model` (input; required) is a folder for loading your model(s); and
 - `test_outputs` is a folder for saving your model outputs.
 
 The [Challenge website](https://physionetchallenges.org/2024/#data) provides a training database with a description of the contents and structure of the data files.
@@ -49,9 +49,9 @@ where
 
 You can use the scripts in this repository to generate synthetic ECG images for the [PTB-XL dataset](https://www.nature.com/articles/s41597-020-0495-6). You will need to generate or otherwise obtain ECG images before running the above steps.
 
-1. Download (and unzip) the [PTB-XL dataset](https://physionet.org/content/ptb-xl/). We will use `ptb-xl` as the folder name that contains the data for these commands (the full folder name is currently  `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3`), but you can replace it with the absolute or relative path on your machine.
+1. Download (and unzip) the [PTB-XL dataset](https://physionet.org/content/ptb-xl/). We will use `ptb-xl` as the folder name that contains the data for these commands (the full folder name for the PTB-XL dataset is currently `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3`), but you can replace it with the absolute or relative path on your machine.
 
-2. Add information from various spreadsheets from the dataset to the WFDB header files:
+2. Add information from various spreadsheets from the PTB-XL dataset to the WFDB header files:
 
         python prepare_ptbxl_data.py \
             -i ptb-xl/records100/00000 \
@@ -66,13 +66,13 @@ You can use the scripts in this repository to generate synthetic ECG images for 
             -o ptb-xl/records100/00000 \
             -se 12345
 
-4. Add the file locations for the synthetic ECG images. You can use this folder for the `train_model` step:
+4. Add the file locations for the synthetic ECG images to the WFDB header files. (The expected image filenames for record `12345.png` are of the form `12345-0.png`, `12345-1.png`, etc., which should be in the same folder.) You can use the `ptb-xl/records100/00000` folder for the `train_model` step:
 
         python add_image_filenames.py \
             -i ptb-xl/records100/00000 \
             -o ptb-xl/records100/00000
 
-5. Remove the waveforms, certain information about the waveforms, and the demographics and diagnoses to create a version of the data for inference. You can use this folder for the `run_model` step:
+5. Remove the waveforms, certain information about the waveforms, and the demographics and diagnoses to create a version of the data for inference. You can use the `ptb-xl/records100_no_waveforms_diagnoses/00000` folder for the `run_model` step:
 
         python remove_waveforms.py \
             -i ptb-xl/records100/00000 \
@@ -83,27 +83,29 @@ You can use the scripts in this repository to generate synthetic ECG images for 
 
 Please edit the following script to add your code:
 
-* `team_code.py` is a script with functions for training and running your trained model.
+* `team_code.py` is a script with functions for training and running your trained model(s).
 
 Please do **not** edit the following scripts. We will use the unedited versions of these scripts when running your code:
 
-* `train_model.py` is a script for training your model.
-* `run_model.py` is a script for running your trained model.
+* `train_model.py` is a script for training your model(s).
+* `run_model.py` is a script for running your trained model(s).
 * `helper_code.py` is a script with helper functions that we used for our code. You are welcome to use them in your code.
 
 These scripts must remain in the root path of your repository, but you can put other scripts and other files elsewhere in your repository.
 
 ## How do I train, save, load, and run my model?
 
-To train and save your models, please edit the `train_digitization_model` and `train_diagnosis_model` functions in the `team_code.py` script. Please do not edit the input or output arguments of these function.
+You can choose to create waveform reconstruction and/or classification models.
 
-To load and run your trained model, please edit the `load_digitization_model`, `load_diagnosis_model`, `run_digitization_model`, and `run_diagnosis_model` functions in the `team_code.py` script. Please do not edit the input or output arguments of the functions of these functions.
+To train and save your model(s), please edit the `train_digitization_model` and `train_diagnosis_model` functions in the `team_code.py` script. Please do not edit the input or output arguments of these function.
+
+To load and run your trained model(s), please edit the `load_digitization_model`, `load_diagnosis_model`, `run_digitization_model`, and `run_diagnosis_model` functions in the `team_code.py` script. Please do not edit the input or output arguments of the functions of these functions.
 
 ## How do I run these scripts in Docker?
 
-Docker and similar platforms allow you to containerize and package your code with specific dependencies so that your code can be reliably run in other computational environments .
+Docker and similar platforms allow you to containerize and package your code with specific dependencies so that your code can be reliably run in other computational environments.
 
-To increase the likelihood that we can run your code, please [install](https://docs.docker.com/get-docker/) Docker, build a Docker image from your code, and run it on the training data. To quickly check your code for bugs, you may want to run it on a small subset of the training data.
+To increase the likelihood that we can run your code, please [install](https://docs.docker.com/get-docker/) Docker, build a Docker image from your code, and run it on the training data. To quickly check your code for bugs, you may want to run it on a small subset of the training data, such as 100 records.
 
 If you have trouble running your code, then please try the follow steps to run the example code.
 
@@ -152,6 +154,8 @@ If you have trouble running your code, then please try the follow steps to run t
         Exit
 
 ## What else do I need?
+
+This repository does not include data or the code for generating ECG images. Please see the above instructions for how to download and prepare the data.
 
 This repository does not include code for evaluating your entry. Please see the [evaluation code repository](https://github.com/physionetchallenges/evaluation-2024) for code and instructions for evaluating your entry using the Challenge scoring metric.
 
