@@ -76,7 +76,7 @@ def run(args):
 
         # Run the dx classification model. Allow or disallow the model to fail on some of the data, which can be helpful for debugging.
         try:
-            dx = run_dx_model(dx_model, data_record, args.verbose) ### Teams: Implement this function!!!
+            dx = run_dx_model(dx_model, data_record, signal, args.verbose) ### Teams: Implement this function!!!
         except:
             if args.allow_failures:
                 if args.verbose >= 2:

@@ -64,7 +64,7 @@ You can use the scripts in this repository to generate synthetic ECG images for 
         python gen_ecg_images_from_data_batch.py \
             -i ptb-xl/records100/00000 \
             -o ptb-xl/records100/00000 \
-            -se 12345
+            --print_header
 
 4. Add the file locations for the synthetic ECG images to the WFDB header files. (The expected image filenames for record `12345.png` are of the form `12345-0.png`, `12345-1.png`, etc., which should be in the same folder.) You can use the `ptb-xl/records100/00000` folder for the `train_model` step:
 
@@ -76,7 +76,6 @@ You can use the scripts in this repository to generate synthetic ECG images for 
 
         python remove_hidden_data.py \
             -i ptb-xl/records100/00000 \
-            -d \
             -o ptb-xl/records100_hidden/00000
 
 ## Which scripts I can edit?

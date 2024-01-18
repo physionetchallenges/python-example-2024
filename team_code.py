@@ -170,7 +170,7 @@ def run_digitization_model(digitization_model, record, verbose):
 
 # Run your trained dx classification model. This function is *required*. You should edit this function to add your code, but do
 # *not* change the arguments of this function.
-def run_dx_model(dx_model, record, verbose):
+def run_dx_model(dx_model, record, signal, verbose):
     model = dx_model['model']
     classes = dx_model['classes']
 
