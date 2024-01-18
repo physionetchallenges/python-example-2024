@@ -20,7 +20,7 @@ You can train your model(s) by running
 
 where
 
-- `training_data` (input; required) is a folder with the training data files, including the images and diagnoses (you can use the `ptb-xl/records100/00000_prepared` folder from the below steps); and
+- `training_data` (input; required) is a folder with the training data files, including the images and diagnoses (you can use the `ptb-xl/records100/00000` folder from the below steps); and
 - `model` (output; required) is a folder for saving your model(s).
 
 You can run your trained model(s) by running
@@ -29,7 +29,7 @@ You can run your trained model(s) by running
 
 where
 
-- `test_data` (input; required) is a folder with the validation or test data files, excluding the images and diagnoses (you can use the `ptb-xl/records100_no_waveforms_diagnoses/00000_prepared` folder from the below steps);
+- `test_data` (input; required) is a folder with the validation or test data files, excluding the images and diagnoses (you can use the `ptb-xl/records100_hidden/00000` folder from the below steps, but it would be better to repeat these steps on a new subset of the data that you did not use to train your model);
 - `model` (input; required) is a folder for loading your model(s); and
 - `test_outputs` is a folder for saving your model outputs.
 
@@ -41,7 +41,7 @@ You can evaluate your model by pulling or downloading the [evaluation code](http
 
 where
 
-- `labels` is a folder with labels for the data, such as the training database on the PhysioNet webpage (you can use the `ptb-xl/records100/00000` folder from the below steps);
+- `labels` is a folder with labels for the data, such as the training database on the PhysioNet webpage (you can use the `ptb-xl/records100/00000` folder from the below steps, but it would be better to repeat these steps on a new subset of the data that you did not use to train your model);
 - `test_outputs` is a folder containing files with your model's outputs for the data; and
 - `scores.csv` (optional) is file with a collection of scores for your model.
 
@@ -51,33 +51,33 @@ You can use the scripts in this repository to generate synthetic ECG images for 
 
 1. Download (and unzip) the [PTB-XL dataset](https://physionet.org/content/ptb-xl/). We will use `ptb-xl` as the folder name that contains the data for these commands (the full folder name for the PTB-XL dataset is currently `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3`), but you can replace it with the absolute or relative path on your machine.
 
-2. Add information from various spreadsheets from the PTB-XL dataset to the WFDB header files (use different input and output folders for now):
+2. Add information from various spreadsheets from the PTB-XL dataset to the WFDB header files:
 
         python prepare_ptbxl_data.py \
             -i ptb-xl/records100/00000 \
             -d ptb-xl/ptbxl_database.csv \
             -s ptb-xl/scp_statements.csv \
-            -o ptb-xl/records100/00000_prepared
+            -o ptb-xl/records100/00000
 
 3. [Generate synthetic ECG images](https://github.com/alphanumericslab/ecg-image-kit/tree/main/codes/ecg-image-generator) on the dataset:
 
         python gen_ecg_images_from_data_batch.py \
-            -i ptb-xl/records100/00000_prepared \
-            -o ptb-xl/records100/00000_prepared \
+            -i ptb-xl/records100/00000 \
+            -o ptb-xl/records100/00000 \
             -se 12345
 
-4. Add the file locations for the synthetic ECG images to the WFDB header files. (The expected image filenames for record `12345.png` are of the form `12345-0.png`, `12345-1.png`, etc., which should be in the same folder.) You can use the `ptb-xl/records100/00000_prepared` folder for the `train_model` step:
+4. Add the file locations for the synthetic ECG images to the WFDB header files. (The expected image filenames for record `12345.png` are of the form `12345-0.png`, `12345-1.png`, etc., which should be in the same folder.) You can use the `ptb-xl/records100/00000` folder for the `train_model` step:
 
         python add_image_filenames.py \
-            -i ptb-xl/records100/00000_prepared \
-            -o ptb-xl/records100/00000_prepared
+            -i ptb-xl/records100/00000 \
+            -o ptb-xl/records100/00000
 
-5. Remove the waveforms, certain information about the waveforms, and the demographics and diagnoses to create a version of the data for inference. You can use the `ptb-xl/records100_no_waveforms_diagnoses/00000_prepared` folder for the `run_model` step:
+5. Remove the waveforms, certain information about the waveforms, and the demographics and diagnoses to create a version of the data for inference. You can use the `ptb-xl/records100_hidden/00000` folder for the `run_model` step, but it would be better to repeat the above steps on a new subset of the data that you will not use to train your model:
 
-        python remove_waveforms.py \
-            -i ptb-xl/records100/00000_prepared \
+        python remove_hidden_data.py \
+            -i ptb-xl/records100/00000 \
             -d \
-            -o ptb-xl/records100_no_waveforms_diagnoses/00000_prepared
+            -o ptb-xl/records100_hidden/00000
 
 ## Which scripts I can edit?
 

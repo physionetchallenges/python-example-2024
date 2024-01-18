@@ -22,26 +22,11 @@ def find_records(folder):
     records = sorted(records)
     return records
 
-# Load the image(s) for a record.
-def load_image(record):
-    from PIL import Image
-
-    path = os.path.split(record)[0]
+# Load the header for a record.
+def load_header(record):
     header_file = get_header_file(record)
     header = load_text(header_file)
-    image_files = get_images(header)
-
-    if len(image_files) == 0:
-        raise FileNotFoundError(f'There are no images for record {record}.')
-
-    images = list()
-    for image_file in image_files:
-        image_file_path = os.path.join(path, image_file)
-        if os.path.isfile(image_file_path):
-            image = Image.open(image_file_path)
-            images.append(image)
-
-    return images
+    return header
 
 # Load the signal(s) for a record.
 def load_signal(record):
@@ -54,18 +39,45 @@ def load_signal(record):
         signal, fields = None, None
     return signal, fields
 
-# Load the diagnosis or diagnoses for a record.
-def load_diagnosis(record):
+def load_signals(record):
+    return load_signal(record)
+
+# Load the image(s) for a record.
+def load_image(record):
+    from PIL import Image
+
+    path = os.path.split(record)[0]
+    image_files = get_image_files(record)
+
+    images = list()
+    for image_file in image_files:
+        image_file_path = os.path.join(path, image_file)
+        if os.path.isfile(image_file_path):
+            image = Image.open(image_file_path)
+            images.append(image)
+
+    return images
+
+def load_images(record):
+    return load_image(record)
+
+# Load the dx class(es) for a record.
+def load_dx(record):
+    header = load_header(record)
+    dx = get_dxs_from_header(header)
+    return dx
+
+def load_dxs(record):
+    return load_dx(record)
+
+# Save the header for a record.
+def save_header(record, header):
     header_file = get_header_file(record)
-    header = load_text(header_file)
-    diagnosis = get_diagnosis(header)
-    return diagnosis
+    save_text(header_file, header)
 
 # Save the signal(s) for a record.
-def save_signal(record, signal):
-    header_file = get_header_file(record)
-    header = load_text(header_file)
-
+def save_signal(record, signal, comments=list()):
+    header = load_header(record)
     path, record = os.path.split(record)
     sampling_frequency = get_sampling_frequency(header)
     signal_formats = get_signal_formats(header)
@@ -83,16 +95,22 @@ def save_signal(record, signal):
 
     import wfdb
     wfdb.wrsamp(record, fs=sampling_frequency, units=signal_units, sig_name=signal_names, \
-                d_signal=signal, fmt=signal_formats, adc_gain=adc_gains, baseline=baselines, write_dir=path)
+                d_signal=signal, fmt=signal_formats, adc_gain=adc_gains, baseline=baselines, comments=comments, \
+                write_dir=path)
 
-    return header
+def save_signals(record, signals):
+    save_signal(record, signals)
 
-# Save the diagnosis or diagnoses for a record.
-def save_diagnosis(record, diagnosis):
+# Save the dx class(es) for a record.
+def save_dx(record, dx):
     header_file = get_header_file(record)
     header = load_text(header_file)
-    header += '#Dx: ' + ', '.join(diagnosis) + '\n'
+    header += '#Dx: ' + ', '.join(dx) + '\n'
     save_text(header_file, header)
+    return header
+
+def save_dxs(record, dxs):
+    return save_dx(record, dxs)
 
 ### Helper Challenge functions
 
@@ -108,7 +126,7 @@ def save_text(filename, string):
         f.write(string)
 
 # Get the record name from a header file.
-def record(string):
+def get_record_name(string):
     value = string.split('\n')[0].split(' ')[0].split('/')[0].strip()
     return value
 
@@ -212,39 +230,52 @@ def get_signal_names(string):
 
 # Get a variable from a string.
 def get_variable(string, variable_name):
-    variable = None
+    variable = ''
+    has_variable = False
     for l in string.split('\n'):
         if l.startswith(variable_name):
             variable = l[len(variable_name):].strip()
-    return variable
+            has_variable = True
+    return variable, has_variable
 
 # Get variables from a text file.
 def get_variables(string, variable_name, sep=','):
     variables = list()
+    has_variable = False
     for l in string.split('\n'):
         if l.startswith(variable_name):
             variables += [variable.strip() for variable in l[len(variable_name):].strip().split(sep)]
-    return variables
+            has_variable = True
+    return variables, has_variable
 
-# Get the diagnosis or diagnoses from a header or a similar string.
-def get_diagnosis(string):
-    diagnosis = get_variables(string, '#Dx:')
-    if len(diagnosis) > 0:
-        return diagnosis
-    else:
-        raise Exception('No diagnosis available: are you trying to load the diagnoses from the held-out dataset?')
+# Get the signal file(s) from a header or a similar string.
+def get_signal_files_from_header(string):
+    signal_files = list()
+    for i, l in enumerate(string.split('\n')):
+        arrs = [arr.strip() for arr in l.split(' ')]
+        if i==0 and not l.startswith('#'):
+            num_channels = int(arrs[1])
+        elif i<=num_channels and not l.startswith('#'):
+            signal_file = arrs[0]
+            if signal_file not in signal_files:
+                signal_files.append(signal_file)
+        else:
+            break
+    return signal_files
 
-# Get the diagnosis or diagnoses from a header or a similar string.
-def get_diagnoses(string):
-    return get_diagnosis(string)
+# Get the image file(s) from a header or a similar string.
+def get_image_files_from_header(string):
+    images, has_image = get_variables(string, '#Image:')
+    if not has_image:
+        raise Exception('No images available: did you forget to generate or include the images?')
+    return images
 
-# Get the image or images from a header or a similar string.
-def get_image(string):
-    return get_variables(string, '#Image:')
-
-# Get the image or images from a header or a similar string.
-def get_images(string):
-    return get_image(string)
+# Get the dx class(es) from a header or a similar string.
+def get_dxs_from_header(string):
+    dxs, has_dx = get_variables(string, '#Dx:')
+    if not has_dx:
+        raise Exception('No dx classes available: are you trying to load the classes from the held-out dataset, or did you forget to prepare the data to include the classes?')
+    return dxs
 
 # Get the header file for a record.
 def get_header_file(record):
@@ -258,26 +289,14 @@ def get_header_file(record):
 def get_signal_files(record):
     header_file = get_header_file(record)
     header = load_text(header_file)
-
-    signal_files = list()
-    for i, l in enumerate(header.split('\n')):
-        arrs = [arr.strip() for arr in l.split(' ')]
-        if i==0 and not l.startswith('#'):
-            num_channels = int(arrs[1])
-        elif i<=num_channels and not l.startswith('#'):
-            signal_file = arrs[0]
-            if signal_file not in signal_files:
-                signal_files.append(signal_file)
-        else:
-            break
-
+    signal_files = get_signal_files_from_header(header)
     return signal_files
 
-# Get the image files for a record.
+# Get the image file(s) for a record.
 def get_image_files(record):
     header_file = get_header_file(record)
     header = load_text(header_file)
-    image_files = get_variables(header, '#Image:')
+    image_files = get_image_files_from_header(header)
     return image_files
 
 ### Evaluation functions

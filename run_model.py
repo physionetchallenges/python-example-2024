@@ -14,7 +14,7 @@ import os
 import sys
 
 from helper_code import *
-from team_code import load_digitization_model, load_diagnosis_model, run_digitization_model, run_diagnosis_model
+from team_code import load_digitization_model, load_dx_model, run_digitization_model, run_dx_model
 
 # Parse arguments.
 def get_parser():
@@ -35,7 +35,7 @@ def run(args):
 
     # You can use these functions to perform tasks, such as loading your model(s), that you only need to perform once.
     digitization_model = load_digitization_model(args.model_folder, args.verbose) ### Teams: Implement this function!!!
-    diagnosis_model = load_diagnosis_model(args.model_folder, args.verbose) ### Teams: Implement this function!!!
+    dx_model = load_dx_model(args.model_folder, args.verbose) ### Teams: Implement this function!!!
 
     # Find the Challenge data.
     if args.verbose:
@@ -58,15 +58,14 @@ def run(args):
     for i in range(num_records):
         if args.verbose:
             width = len(str(num_records))
-            print(f'...    {records[i]}; {i+1:>{width}}/{num_records}...')
+            print(f'- {i+1:>{width}}/{num_records}: {records[i]}...')
 
-        record = os.path.join(args.data_folder, records[i])
-        header_file = get_header_file(record)
-        header = load_text(header_file)
+        data_record = os.path.join(args.data_folder, records[i])
+        output_record = os.path.join(args.output_folder, records[i])
 
         # Run the digitization model. Allow or disallow the model to fail on some of the data, which can be helpful for debugging.
         try:
-            signal = run_digitization_model(digitization_model, record, args.verbose) ### Teams: Implement this function!!!
+            signal = run_digitization_model(digitization_model, data_record, args.verbose) ### Teams: Implement this function!!!
         except:
             if args.allow_failures:
                 if args.verbose:
@@ -75,29 +74,34 @@ def run(args):
             else:
                 raise
 
-        # Run the diagnosis model. Allow or disallow the model to fail on some of the data, which can be helpful for debugging.
+        # Run the dx classification model. Allow or disallow the model to fail on some of the data, which can be helpful for debugging.
         try:
-            diagnosis = run_diagnosis_model(diagnosis_model, record, args.verbose) ### Teams: Implement this function!!!
+            dx = run_dx_model(dx_model, data_record, args.verbose) ### Teams: Implement this function!!!
         except:
             if args.allow_failures:
                 if args.verbose >= 2:
-                    print('... diagnosis failed.')
-                diagnosis = None
+                    print('... dx classification failed.')
+                dx = None
             else:
                 raise
 
         # Save Challenge outputs.
-        record = os.path.join(args.output_folder, records[i])
-        path = os.path.split(record)[0]
-        os.makedirs(path, exist_ok=True)
+        output_path = os.path.split(output_record)[0]
+        os.makedirs(output_path, exist_ok=True)
 
-        header_file = get_header_file(record)
-        save_text(header_file, header)
+        data_header = load_header(data_record)
+        save_header(output_record, data_header)
 
         if signal is not None:
-            header = save_signal(record, signal)
-        if diagnosis is not None:
-            header = save_diagnosis(record, diagnosis)
+            save_signal(output_record, signal)
+
+            comment_lines = [l for l in data_header.split('\n') if l.startswith('#')]
+            signal_header = load_header(output_record)
+            signal_header += ''.join(comment_lines) + '\n'
+            save_header(output_record, signal_header)
+
+        if dx is not None:
+            save_dx(output_record, dx)
 
     if args.verbose:
         print('Done.')

@@ -13,7 +13,7 @@ import argparse
 import sys
 
 from helper_code import *
-from team_code import train_digitization_model, train_diagnosis_model
+from team_code import train_digitization_model, train_dx_model
 
 # Parse arguments.
 def get_parser():
@@ -27,7 +27,7 @@ def get_parser():
 # Run the code.
 def run(args):
     train_digitization_model(args.data_folder, args.model_folder, args.verbose) ### Teams: Implement this function!!!
-    train_diagnosis_model(args.data_folder, args.model_folder, args.verbose) ### Teams: Implement this function!!!
+    train_dx_model(args.data_folder, args.model_folder, args.verbose) ### Teams: Implement this function!!!
 
 if __name__ == '__main__':
     run(get_parser().parse_args(sys.argv[1:]))

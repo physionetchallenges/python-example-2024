@@ -28,7 +28,7 @@ def train_digitization_model(data_folder, model_folder, verbose):
     # Find data files.
     if verbose:
         print('Training the digitization model...')
-        print('... finding the Challenge data...')
+        print('Finding the Challenge data...')
 
     records = find_records(data_folder)
     num_records = len(records)
@@ -41,50 +41,41 @@ def train_digitization_model(data_folder, model_folder, verbose):
 
     # Extract the features and labels.
     if verbose:
-        print('... extracting features and labels from the data...')
+        print('Extracting features and labels from the data...')
 
     features = list()
 
     for i in range(num_records):
         if verbose:
             width = len(str(num_records))
-            print(f'...    {i+1:>{width}}/{num_records}...')
+            print(f'- {i+1:>{width}}/{num_records}: {records[i]}...')
 
         record = os.path.join(data_folder, records[i])
-        current_features = get_features(record)
+
+        # Extract the features from the image...
+        current_features = extract_features(record)
         features.append(current_features)
 
     # Train the model.
     if verbose:
-        print('... training the model on the data...')
+        print('Training the model on the data...')
 
-    # Define parameters for random forest classifier and regressor.
-
-    ###
-    ### TO-DO: ADD CODE.
-    ###
-
-    # Fit the models.
-
-    ###
-    ### TO-DO: ADD CODE.
-    ###
-
+    # This overly simple model uses the mean of these overly simple features as a seed for a random number generator.
     model = np.mean(features)
 
-    # Save the models.
+    # Save the model.
     save_digitization_model(model_folder, model)
 
     if verbose:
         print('Done.')
         print()
 
-# Train your diagnosis model.
-def train_diagnosis_model(data_folder, model_folder, verbose):
+# Train your dx model.
+def train_dx_model(data_folder, model_folder, verbose):
     # Find data files.
     if verbose:
-        print('Training the diagnosis model...')
-        print('... finding the Challenge data...')
+        print('Training the dx classification model...')
+        print('Finding the Challenge data...')
 
     records = find_records(data_folder)
     num_records = len(records)
@@ -97,45 +88,47 @@ def train_diagnosis_model(data_folder, model_folder, verbose):
 
     # Extract the features and labels.
     if verbose:
-        print('... extracting features and labels from the data...')
+        print('Extracting features and labels from the data...')
 
     features = list()
-    diagnoses = list()
+    dxs = list()
 
     for i in range(num_records):
         if verbose:
             width = len(str(num_records))
-            print(f'...    {records[i]}; {i+1:>{width}}/{num_records}...')
+            print(f'- {i+1:>{width}}/{num_records}: {records[i]}...')
 
         record = os.path.join(data_folder, records[i])
-        current_features = get_features(record)
-        features.append(current_features)
 
-        # Extract labels.
-        header_file = get_header_file(record)
-        header = load_text(header_file)
-        diagnosis = get_diagnosis(header)
-        diagnoses.append(diagnosis)
+        # Extract the features from the image, but only if the image has one or more dx classes.
+        dx = load_dx(record)
+        if dx:
+            current_features = extract_features(record)
+            features.append(current_features)
+            dxs.append(dx)
+
+    if not dxs:
+        raise Exception('There are no labels for the data.')
 
     features = np.vstack(features)
-    classes = sorted(set.union(*map(set, diagnoses)))
-    diagnoses = compute_one_hot_encoding(diagnoses, classes)
+    classes = sorted(set.union(*map(set, dxs)))
+    dxs = compute_one_hot_encoding(dxs, classes)
 
-    # Train the models.
+    # Train the model.
     if verbose:
-        print('... training the model on the data...')
+        print('Training the model on the data...')
 
     # Define parameters for random forest classifier and regressor.
     n_estimators   = 123  # Number of trees in the forest.
     max_leaf_nodes = 456  # Maximum number of leaf nodes in each tree.
     random_state   = 789  # Random state; set for reproducibility.
 
-    # Fit the models.
+    # Fit the model.
     model = RandomForestClassifier(
-        n_estimators=n_estimators, max_leaf_nodes=max_leaf_nodes, random_state=random_state).fit(features, diagnoses)
+        n_estimators=n_estimators, max_leaf_nodes=max_leaf_nodes, random_state=random_state).fit(features, dxs)
 
-    # Save the models.
-    save_diagnosis_model(model_folder, model, classes)
+    # Save the model.
+    save_dx_model(model_folder, model, classes)
 
     if verbose:
         print('Done.')
@@ -147,44 +140,42 @@ def load_digitization_model(model_folder, verbose):
     filename = os.path.join(model_folder, 'digitization_model.sav')
     return joblib.load(filename)
 
-# Load your trained diagnosis model. This function is *required*. You should edit this function to add your code, but do *not*
-# change the arguments of this function. If you do not train a diagnosis model, then you can return None.
-def load_diagnosis_model(model_folder, verbose):
-    filename = os.path.join(model_folder, 'diagnosis_model.sav')
+# Load your trained dx classification model. This function is *required*. You should edit this function to add your code, but do
+# *not* change the arguments of this function. If you do not train a dx classification model, then you can return None.
+def load_dx_model(model_folder, verbose):
+    filename = os.path.join(model_folder, 'dx_model.sav')
     return joblib.load(filename)
 
 # Run your trained digitization model. This function is *required*. You should edit this function to add your code, but do *not*
 # change the arguments of this function.
 def run_digitization_model(digitization_model, record, verbose):
-    ###
-    ### TO-DO: ADD CODE.
-    ###
+    model = digitization_model['model']
 
-    ###
-    ### TO-DO: REMOVE BELOW LINES.
-    ###
+    # Extract features.
+    features = extract_features(record)
 
-    seed = digitization_model['model']
-
+    # Load the dimensions of the signal.
     header_file = get_header_file(record)
     header = load_text(header_file)
 
     num_samples = get_num_samples(header)
     num_signals = get_num_signals(header)
 
-    signal = np.random.default_rng(seed=int(round(seed))).uniform(low=-1000, high=1000, size=(num_samples, num_signals))
+    # For a overly simply minimal working example, generate "random" waveforms.
+    seed = int(round(model + np.mean(features)))
+    signal = np.random.default_rng(seed=seed).uniform(low=-1000, high=1000, size=(num_samples, num_signals))
     signal = np.asarray(signal, dtype=np.int16)
 
     return signal
 
-# Run your trained diagnosis model. This function is *required*. You should edit this function to add your code, but do *not* change
-# the arguments of this function.
-def run_diagnosis_model(diagnosis_model, record, verbose):
-    model = diagnosis_model['model']
-    classes = diagnosis_model['classes']
+# Run your trained dx classification model. This function is *required*. You should edit this function to add your code, but do
+# *not* change the arguments of this function.
+def run_dx_model(dx_model, record, verbose):
+    model = dx_model['model']
+    classes = dx_model['classes']
 
     # Extract features.
-    features = get_features(record)
+    features = extract_features(record)
     features = features.reshape(1, -1)
 
     # Get model probabilities.
@@ -204,7 +195,7 @@ def run_diagnosis_model(diagnosis_model, record, verbose):
 ################################################################################
 
 # Extract features.
-def get_features(record):
+def extract_features(record):
     images = load_image(record)
     mean = 0.0
     std = 0.0
@@ -212,7 +203,7 @@ def get_features(record):
         image = np.asarray(image)
         mean += np.mean(image)
         std += np.std(image)
-    return np.array([mean, std])  
+    return np.array([mean, std])
 
 # Save your trained digitization model.
 def save_digitization_model(model_folder, model):
@@ -220,8 +211,8 @@ def save_digitization_model(model_folder, model):
     filename = os.path.join(model_folder, 'digitization_model.sav')
     joblib.dump(d, filename, protocol=0)
 
-# Save your trained diagnosis model.
-def save_diagnosis_model(model_folder, model, classes):
+# Save your trained dx classification model.
+def save_dx_model(model_folder, model, classes):
     d = {'model': model, 'classes': classes}
-    filename = os.path.join(model_folder, 'diagnosis_model.sav')
+    filename = os.path.join(model_folder, 'dx_model.sav')
     joblib.dump(d, filename, protocol=0)
