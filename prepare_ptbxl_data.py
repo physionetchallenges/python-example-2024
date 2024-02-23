@@ -14,7 +14,7 @@ from helper_code import *
 
 # Parse arguments.
 def get_parser():
-    description = 'Prepare PTB-XL data.'
+    description = 'Prepare the PTB-XL database for use in the Challenge.'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-i', '--input_folder', type=str, required=True)
     parser.add_argument('-d', '--database_file', type=str, required=True) # ptbxl_database.csv
@@ -24,40 +24,23 @@ def get_parser():
 
 # Run script.
 def run(args):
-    # Identify PTB-XL superclasses.
-    df = pd.read_csv(args.statements_file, index_col=0)
-    subclass_to_superclass = dict()
-    for i, row in df.iterrows():
-        if row['diagnostic'] == 1:
-            subclass = i.strip()
-            superclass = row['diagnostic_class'].strip()
-            subclass_to_superclass[subclass] = superclass
+    # Load the PTB-XL database.
+    df = pd.read_csv(args.database_file, index_col='ecg_id')
+    df.scp_codes = df.scp_codes.apply(lambda x: ast.literal_eval(x))
 
-    # For the PTB-XL database, assign superclasses to subclasses; commands from PhysioNet project documentation.
-    def assign_superclass(subclasses):
-        superclasses = list()
-        for subclass in subclasses:
-            if subclass in subclass_to_superclass:
-                superclass = subclass_to_superclass[subclass]
-                if superclass not in superclasses:
-                    superclasses.append(superclass)
-        return superclasses
+    # Load the SCP statements.
+    dg = pd.read_csv(args.statements_file, index_col=0)
 
-    # Apply PTB-XL superclasses.
-    dg = pd.read_csv(args.database_file, index_col='ecg_id')
-    dg.scp_codes = dg.scp_codes.apply(lambda x: ast.literal_eval(x))
-    dg['diagnostic_superclass'] = dg.scp_codes.apply(assign_superclass)
-
-    # Identify header files.
+    # Identify the header files.
     records = find_records(args.input_folder)
 
-    # Update header files and copy signal files.
+    # Update the header files and copy the signal files.
     for record in records:
 
         # Extract the demographics data.
         record_path, record_basename = os.path.split(record)
         ecg_id = int(record_basename.split('_')[0])
-        row = dg.loc[ecg_id]
+        row = df.loc[ecg_id]
 
         recording_date_string = row['recording_date']
         date_string, time_string = recording_date_string.split(' ')
@@ -82,7 +65,11 @@ def run(args):
         weight = cast_int_float_unknown(weight)
 
         # Extract the diagnostic superclasses.
-        dx = ', '.join(row['diagnostic_superclass'])
+        scp_codes = row['scp_codes']
+        if 'NORM' in scp_codes:
+            dx = 'Normal'
+        else:
+            dx = 'Abnormal'
 
         # Update the header file.
         input_header_file = os.path.join(args.input_folder, record + '.hea')

@@ -39,6 +39,7 @@ def load_signal(record):
         signal, fields = None, None
     return signal, fields
 
+# Load the signal(s) for a record.
 def load_signals(record):
     return load_signal(record)
 
@@ -58,6 +59,7 @@ def load_image(record):
 
     return images
 
+# Load the image(s) for a record.
 def load_images(record):
     return load_image(record)
 
@@ -98,6 +100,7 @@ def save_signal(record, signal, comments=list()):
                 d_signal=signal, fmt=signal_formats, adc_gain=adc_gains, baseline=baselines, comments=comments, \
                 write_dir=path)
 
+# Save the signal(s) for a record.
 def save_signals(record, signals):
     save_signal(record, signals)
 
@@ -125,109 +128,6 @@ def save_text(filename, string):
     with open(filename, 'w') as f:
         f.write(string)
 
-# Get the record name from a header file.
-def get_record_name(string):
-    value = string.split('\n')[0].split(' ')[0].split('/')[0].strip()
-    return value
-
-# Get the number of signals from a header file.
-def get_num_signals(string):
-    value = string.split('\n')[0].split(' ')[1].strip()
-    if is_integer(value):
-        value = int(value)
-    else:
-        value = None
-    return value
-
-# Get the sampling frequency from a header file.
-def get_sampling_frequency(string):
-    value = string.split('\n')[0].split(' ')[2].split('/')[0].strip()
-    if is_number(value):
-        value = float(value)
-    else:
-        value = None
-    return value
-
-# Get the number of samples from a header file.
-def get_num_samples(string):
-    value = string.split('\n')[0].split(' ')[3].strip()
-    if is_integer(value):
-        value = int(value)
-    else:
-        value = None
-    return value
-
-# Get signal units from a header file.
-def get_signal_formats(string):
-    num_signals = get_num_signals(string)
-    values = list()
-    for i, l in enumerate(string.split('\n')):
-        if 1 <= i <= num_signals:
-            field = l.split(' ')[1]
-            if 'x' in field:
-                field = field.split('x')[0]
-            if ':' in field:
-                field = field.split(':')[0]
-            if '+' in field:
-                field = field.split('+')[0]
-            value = field
-            values.append(value)
-    return values
-
-# Get signal units from a header file.
-def get_adc_gains(string):
-    num_signals = get_num_signals(string)
-    values = list()
-    for i, l in enumerate(string.split('\n')):
-        if 1 <= i <= num_signals:
-            field = l.split(' ')[2]
-            if '/' in field:
-                field = field.split('/')[0]
-            if '(' in field and ')' in field:
-                field = field.split('(')[0]
-            value = float(field)
-            values.append(value)
-    return values
-
-# Get signal units from a header file.
-def get_baselines(string):
-    num_signals = get_num_signals(string)
-    values = list()
-    for i, l in enumerate(string.split('\n')):
-        if 1 <= i <= num_signals:
-            field = l.split(' ')[2]
-            if '/' in field:
-                field = field.split('/')[0]
-            if '(' in field and ')' in field:
-                field = field.split('(')[1].split(')')[0]
-            value = int(field)
-            values.append(value)
-    return values
-
-# Get signal units from a header file.
-def get_signal_units(string):
-    num_signals = get_num_signals(string)
-    values = list()
-    for i, l in enumerate(string.split('\n')):
-        if 1 <= i <= num_signals:
-            field = l.split(' ')[2]
-            if '/' in field:
-                value = field.split('/')[1]
-            else:
-                value = 'mV'
-            values.append(value)
-    return values
-
-# Get the number of samples from a header file.
-def get_signal_names(string):
-    num_signals = get_num_signals(string)
-    values = list()
-    for i, l in enumerate(string.split('\n')):
-        if 1 <= i <= num_signals:
-            value = l.split(' ')[8]
-            values.append(value)
-    return values
-
 # Get a variable from a string.
 def get_variable(string, variable_name):
     variable = ''
@@ -238,7 +138,7 @@ def get_variable(string, variable_name):
             has_variable = True
     return variable, has_variable
 
-# Get variables from a text file.
+# Get variables from a string.
 def get_variables(string, variable_name, sep=','):
     variables = list()
     has_variable = False
@@ -298,6 +198,168 @@ def get_image_files(record):
     header = load_text(header_file)
     image_files = get_image_files_from_header(header)
     return image_files
+
+### WFDB functions
+
+# Get the record name from a header file.
+def get_record_name(string):
+    value = string.split('\n')[0].split(' ')[0].split('/')[0].strip()
+    return value
+
+# Get the number of signals from a header file.
+def get_num_signals(string):
+    value = string.split('\n')[0].split(' ')[1].strip()
+    if is_integer(value):
+        value = int(value)
+    else:
+        value = None
+    return value
+
+# Get the sampling frequency from a header file.
+def get_sampling_frequency(string):
+    value = string.split('\n')[0].split(' ')[2].split('/')[0].strip()
+    if is_number(value):
+        value = float(value)
+    else:
+        value = None
+    return value
+
+# Get the number of samples from a header file.
+def get_num_samples(string):
+    value = string.split('\n')[0].split(' ')[3].strip()
+    if is_integer(value):
+        value = int(value)
+    else:
+        value = None
+    return value
+
+# Get the signal formats from a header file.
+def get_signal_formats(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[1]
+            if 'x' in field:
+                field = field.split('x')[0]
+            if ':' in field:
+                field = field.split(':')[0]
+            if '+' in field:
+                field = field.split('+')[0]
+            value = field
+            values.append(value)
+    return values
+
+# Get the ADC gains from a header file.
+def get_adc_gains(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[2]
+            if '/' in field:
+                field = field.split('/')[0]
+            if '(' in field and ')' in field:
+                field = field.split('(')[0]
+            value = float(field)
+            values.append(value)
+    return values
+
+# Get the baselines from a header file.
+def get_baselines(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[2]
+            if '/' in field:
+                field = field.split('/')[0]
+            if '(' in field and ')' in field:
+                field = field.split('(')[1].split(')')[0]
+            else:
+                field = get_adc_zeros(string)[i-1]
+            value = int(field)
+            values.append(value)
+    return values
+
+# Get the signal units from a header file.
+def get_signal_units(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[2]
+            if '/' in field:
+                value = field.split('/')[1]
+            else:
+                value = 'mV'
+            values.append(value)
+    return values
+
+# Get the ADC resolutions from a header file.
+def get_adc_resolutions(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[3]
+            value = int(field)
+            values.append(value)
+    return values
+
+# Get the ADC zeros from a header file.
+def get_adc_zeros(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[4]
+            value = int(field)
+            values.append(value)
+    return values
+
+# Get the initial values of a signal from a header file.
+def get_initial_values(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[5]
+            value = int(field)
+            values.append(value)
+    return values
+
+# Get the checksums of a signal from a header file.
+def get_checksums(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[6]
+            value = int(field)
+            values.append(value)
+    return values
+
+# Get the block sizes of a signal from a header file.
+def get_block_sizes(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            field = l.split(' ')[7]
+            value = int(field)
+            values.append(value)
+    return values
+
+# Get the signal names from a header file.
+def get_signal_names(string):
+    num_signals = get_num_signals(string)
+    values = list()
+    for i, l in enumerate(string.split('\n')):
+        if 1 <= i <= num_signals:
+            value = l.split(' ')[8]
+            values.append(value)
+    return values
 
 ### Evaluation functions
 
@@ -493,7 +555,7 @@ def compute_weighted_absolute_difference(label_signal, output_signal, fs):
     w = filtfilt(np.ones(m), m, label_signal, method='gust')
     w = 1 - 0.5/np.max(w) * w
     n = np.sum(w)
-    
+
     weighted_absolute_difference_metric = np.sum(np.abs(label_signal-output_signal) * w)/n
 
     return weighted_absolute_difference_metric

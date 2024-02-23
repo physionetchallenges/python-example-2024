@@ -36,9 +36,6 @@ def train_digitization_model(data_folder, model_folder, verbose):
     if num_records == 0:
         raise FileNotFoundError('No data was provided.')
 
-    # Create a folder for the model if it does not already exist.
-    os.makedirs(model_folder, exist_ok=True)
-
     # Extract the features and labels.
     if verbose:
         print('Extracting features and labels from the data...')
@@ -63,6 +60,9 @@ def train_digitization_model(data_folder, model_folder, verbose):
     # This overly simple model uses the mean of these overly simple features as a seed for a random number generator.
     model = np.mean(features)
 
+    # Create a folder for the model if it does not already exist.
+    os.makedirs(model_folder, exist_ok=True)
+
     # Save the model.
     save_digitization_model(model_folder, model)
 
@@ -70,7 +70,7 @@ def train_digitization_model(data_folder, model_folder, verbose):
         print('Done.')
         print()
 
-# Train your dx model.
+# Train your dx classification model.
 def train_dx_model(data_folder, model_folder, verbose):
     # Find data files.
     if verbose:
@@ -82,9 +82,6 @@ def train_dx_model(data_folder, model_folder, verbose):
 
     if num_records == 0:
         raise FileNotFoundError('No data was provided.')
-
-    # Create a folder for the model if it does not already exist.
-    os.makedirs(model_folder, exist_ok=True)
 
     # Extract the features and labels.
     if verbose:
@@ -126,6 +123,9 @@ def train_dx_model(data_folder, model_folder, verbose):
     # Fit the model.
     model = RandomForestClassifier(
         n_estimators=n_estimators, max_leaf_nodes=max_leaf_nodes, random_state=random_state).fit(features, dxs)
+
+    # Create a folder for the model if it does not already exist.
+    os.makedirs(model_folder, exist_ok=True)
 
     # Save the model.
     save_dx_model(model_folder, model, classes)
