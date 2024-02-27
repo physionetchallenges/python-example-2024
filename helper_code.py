@@ -411,15 +411,17 @@ def compute_f_measure(labels, outputs):
 
 # Reorder channels in signal.
 def reorder_signal(input_signal, input_channels, output_channels):
-    if input_signal is None:
-        return None
+    # Do not allow repeated channels with potentially different values in a signal.
+    assert(len(set(input_channels)) == len(input_channels))
+    assert(len(set(output_channels)) == len(output_channels))
 
-    if input_channels == output_channels and len(set(input_channels)) == len(set(output_channels)) == len(output_channels):
+    if input_channels == output_channels:
         output_signal = input_signal
     else:
         input_channels = [channel.strip().casefold() for channel in input_channels]
         output_channels = [channel.strip().casefold() for channel in output_channels]
 
+        input_signal = np.asarray(input_signal)
         num_samples = np.shape(input_signal)[0]
         num_channels = len(output_channels)
         data_type = input_signal.dtype
@@ -428,19 +430,17 @@ def reorder_signal(input_signal, input_channels, output_channels):
         for i, output_channel in enumerate(output_channels):
             for j, input_channel in enumerate(input_channels):
                 if input_channel == output_channel:
-                    output_signal[:, i] += input_signal[:, j]
+                    output_signal[:, i] = input_signal[:, j]
 
     return output_signal
 
 # Pad or truncate signal.
 def trim_signal(input_signal, num_samples):
-    if input_signal is None:
-        return None
-
-    cur_samples, num_channels = np.shape(input_signal)
+    input_signal = np.asarray(input_signal)
+    num_samples_input, num_channels_input = np.shape(input_signal)
     data_type = input_signal.dtype
 
-    if cur_samples == num_samples:
+    if num_samples_input == num_samples:
         output_signal = input_signal
     else:
         output_signal = np.zeros((num_samples, num_channels), dtype=data_type)
@@ -455,10 +455,16 @@ def trim_signal(input_signal, num_samples):
 def compute_snr(label_signal, output_signal):
     label_signal = np.asarray(label_signal)
     output_signal = np.asarray(output_signal)
-    assert(np.all(np.shape(label_signal) == np.shape(output_signal)))
 
-    label_signal[np.isnan(label_signal)] = 0
-    output_signal[np.isnan(output_signal)] = 0
+    assert(label_signal.ndim == output_signal.ndim == 1)
+    assert(np.size(label_signal) == np.size(output_signal))
+
+    idx_finite_signal = np.isfinite(label_signal)
+    label_signal = label_signal[idx_finite_signal]
+    output_signal = output_signal[idx_finite_signal]
+
+    idx_nan_signal = np.isnan(output_signal)
+    output_signal[idx_nan_signal] = 0
 
     noise_signal = output_signal - label_signal
 
@@ -478,10 +484,16 @@ def compute_snr(label_signal, output_signal):
 def compute_snr_median(label_signal, output_signal):
     label_signal = np.asarray(label_signal)
     output_signal = np.asarray(output_signal)
-    assert(np.all(np.shape(label_signal) == np.shape(output_signal)))
 
-    label_signal[np.isnan(label_signal)] = 0
-    output_signal[np.isnan(output_signal)] = 0
+    assert(label_signal.ndim == output_signal.ndim == 1)
+    assert(np.size(label_signal) == np.size(output_signal))
+
+    idx_finite_signal = np.isfinite(label_signal)
+    label_signal = label_signal[idx_finite_signal]
+    output_signal = output_signal[idx_finite_signal]
+
+    idx_nan_signal = np.isnan(output_signal)
+    output_signal[idx_nan_signal] = 0
 
     noise_signal = output_signal - label_signal
 
@@ -499,10 +511,16 @@ def compute_snr_median(label_signal, output_signal):
 def compute_ks_metric(label_signal, output_signal):
     label_signal = np.asarray(label_signal)
     output_signal = np.asarray(output_signal)
-    assert(np.all(np.shape(label_signal) == np.shape(output_signal)))
 
-    label_signal[np.isnan(label_signal)] = 0
-    output_signal[np.isnan(output_signal)] = 0
+    assert(label_signal.ndim == output_signal.ndim == 1)
+    assert(np.size(label_signal) == np.size(output_signal))
+
+    idx_finite_signal = np.isfinite(label_signal)
+    label_signal = label_signal[idx_finite_signal]
+    output_signal = output_signal[idx_finite_signal]
+
+    idx_nan_signal = np.isnan(output_signal)
+    output_signal[idx_nan_signal] = 0
 
     label_signal_cdf = np.cumsum(np.abs(label_signal))
     output_signal_cdf = np.cumsum(np.abs(output_signal))
@@ -520,10 +538,16 @@ def compute_ks_metric(label_signal, output_signal):
 def compute_asci_metric(label_signal, output_signal, beta=0.05):
     label_signal = np.asarray(label_signal)
     output_signal = np.asarray(output_signal)
-    assert(np.all(np.shape(label_signal) == np.shape(output_signal)))
 
-    label_signal[np.isnan(label_signal)] = 0
-    output_signal[np.isnan(output_signal)] = 0
+    assert(label_signal.ndim == output_signal.ndim == 1)
+    assert(np.size(label_signal) == np.size(output_signal))
+
+    idx_finite_signal = np.isfinite(label_signal)
+    label_signal = label_signal[idx_finite_signal]
+    output_signal = output_signal[idx_finite_signal]
+
+    idx_nan_signal = np.isnan(output_signal)
+    output_signal[idx_nan_signal] = 0
 
     if beta <= 0 or beta > 1:
         raise ValueError('The beta value should be greater than 0 and less than or equal to 1.')
@@ -544,7 +568,16 @@ def compute_asci_metric(label_signal, output_signal, beta=0.05):
 def compute_weighted_absolute_difference(label_signal, output_signal, fs):
     label_signal = np.asarray(label_signal)
     output_signal = np.asarray(output_signal)
-    assert(label_signal.ndim == 1 and np.size(label_signal) == np.size(output_signal))
+
+    assert(label_signal.ndim == output_signal.ndim == 1)
+    assert(np.size(label_signal) == np.size(output_signal))
+
+    idx_finite_signal = np.isfinite(label_signal)
+    label_signal = label_signal[idx_finite_signal]
+    output_signal = output_signal[idx_finite_signal]
+
+    idx_nan_signal = np.isnan(output_signal)
+    output_signal[idx_nan_signal] = 0
 
     from scipy.signal import filtfilt
 
