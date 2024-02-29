@@ -565,7 +565,7 @@ def compute_asci_metric(label_signal, output_signal, beta=0.05):
     return asci
 
 # Compute a weighted absolute difference metric.
-def compute_weighted_absolute_difference(label_signal, output_signal, fs):
+def compute_weighted_absolute_difference(label_signal, output_signal, sampling_frequency):
     label_signal = np.asarray(label_signal)
     output_signal = np.asarray(output_signal)
 
@@ -581,10 +581,7 @@ def compute_weighted_absolute_difference(label_signal, output_signal, fs):
 
     from scipy.signal import filtfilt
 
-    label_signal[np.isnan(label_signal)] = 0
-    output_signal[np.isnan(output_signal)] = 0
-
-    m = np.size(label_signal)
+    m = round(0.1 * sampling_frequency)
     w = filtfilt(np.ones(m), m, label_signal, method='gust')
     w = 1 - 0.5/np.max(w) * w
     n = np.sum(w)
