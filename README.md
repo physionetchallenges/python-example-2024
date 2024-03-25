@@ -23,6 +23,8 @@ where
 - `training_data` (input; required) is a folder with the training data files, including the images and diagnoses (you can use the `ptb-xl/records100/00000` folder from the below steps); and
 - `model` (output; required) is a folder for saving your model(s).
 
+We are asking teams to include working training code and a pre-trained model. Please include your pre-trained model in the `model` folder so that we can load it with the below command.
+
 You can run your trained model(s) by running
 
     python run_model.py -d test_data -m model -o test_outputs
@@ -32,6 +34,8 @@ where
 - `test_data` (input; required) is a folder with the validation or test data files, excluding the images and diagnoses (you can use the `ptb-xl/records100_hidden/00000` folder from the below steps, but it would be better to repeat these steps on a new subset of the data that you did not use to train your model);
 - `model` (input; required) is a folder for loading your model(s); and
 - `test_outputs` is a folder for saving your model outputs.
+
+We are asking teams to include working training code and a pre-trained model. Please include your pre-trained model in the `model` folder so that we can load it with the above command.
 
 The [Challenge website](https://physionetchallenges.org/2024/#data) provides a training database with a description of the contents and structure of the data files.
 
