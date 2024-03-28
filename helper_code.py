@@ -435,19 +435,19 @@ def reorder_signal(input_signal, input_channels, output_channels):
     return output_signal
 
 # Pad or truncate signal.
-def trim_signal(input_signal, num_samples):
+def trim_signal(input_signal, num_samples_trimmed):
     input_signal = np.asarray(input_signal)
-    num_samples_input, num_channels_input = np.shape(input_signal)
+    num_samples, num_channels = np.shape(input_signal)
     data_type = input_signal.dtype
 
-    if num_samples_input == num_samples:
+    if num_samples == num_samples_trimmed:
         output_signal = input_signal
     else:
-        output_signal = np.zeros((num_samples, num_channels), dtype=data_type)
-        if cur_samples < num_samples: # Zero-pad the signals.
-            output_signal[:cur_samples, :] = input_signal
+        output_signal = np.zeros((num_samples_trimmed, num_channels), dtype=data_type)
+        if num_samples < num_samples_trimmed: # Zero-pad the signals.
+            output_signal[:num_samples, :] = input_signal
         else: # Truncate the signals.
-            output_signal = input_signal[:num_samples, :]
+            output_signal = input_signal[:num_samples_trimmed, :]
 
     return output_signal
 
