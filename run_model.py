@@ -97,7 +97,7 @@ def run(args):
 
             comment_lines = [l for l in data_header.split('\n') if l.startswith('#')]
             signal_header = load_header(output_record)
-            signal_header += ''.join(comment_lines) + '\n'
+            signal_header += '\n'.join(comment_lines) + '\n'
             save_header(output_record, signal_header)
 
         if dx is not None:
