@@ -17,30 +17,61 @@ def get_parser():
     description = 'Prepare the PTB-XL database for use in the Challenge.'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-i', '--input_folder', type=str, required=True)
-    parser.add_argument('-d', '--database_file', type=str, required=True) # ptbxl_database.csv
-    parser.add_argument('-s', '--statements_file', type=str, required=True) # scp_statements.csv
+    parser.add_argument('-pd', '--ptbxl_database_file', type=str, required=True) # ptbxl_database.csv
+    parser.add_argument('-pm', '--ptbxl_mapping_file', type=str, required=True) # scp_statements.csv
+    parser.add_argument('-sd', '--sl_database_file', type=str, required=True) # 12sl_statements.csv
+    parser.add_argument('-sm', '--sl_mapping_file', type=str, required=True) # 12slv23ToSNOMED.csv
     parser.add_argument('-o', '--output_folder', type=str, required=True)
     return parser
 
 # Run script.
 def run(args):
-    # Load the PTB-XL database.
-    df = pd.read_csv(args.database_file, index_col='ecg_id')
-    df.scp_codes = df.scp_codes.apply(lambda x: ast.literal_eval(x))
+    # Assign each class to a superclass; these commands were adapted from the PhysioNet project documentation.
+    df_ptbxl_mapping = pd.read_csv(args.ptbxl_mapping_file, index_col=0)
+    subclass_to_superclass = dict()
+    for i, row in df_ptbxl_mapping.iterrows():
+        if row['diagnostic'] == 1:
+            subclass_to_superclass[i] = row['diagnostic_class']
 
-    # Load the SCP statements.
-    dg = pd.read_csv(args.statements_file, index_col=0)
+    def assign_superclass(subclasses):
+        superclasses = list()
+        for subclass in subclasses:
+            if subclass in subclass_to_superclass:
+                superclass = subclass_to_superclass[subclass]
+                if superclass not in superclasses:
+                    superclasses.append(superclass)
+        return superclasses
+
+    # Load the PTB-XL labels.
+    df_ptbxl_database = pd.read_csv(args.ptbxl_database_file, index_col='ecg_id')
+    df_ptbxl_database.scp_codes = df_ptbxl_database.scp_codes.apply(lambda x: ast.literal_eval(x))
+
+    # Map the PTB-XL classes to superclasses.
+    df_ptbxl_database['diagnostic_superclass'] = df_ptbxl_database.scp_codes.apply(assign_superclass)
+
+    # Load the 12SL labels.
+    df_sl_database = pd.read_csv(args.sl_database_file, index_col='ecg_id')
+
+    # Map the 12SL classes to the PTB-XL classes for the following acute myocardial infarction (MI) classes; PTB-XL does not include
+    # a separate acute MI class.
+    df_sl_mapping = pd.read_csv(args.sl_mapping_file, index_col='StatementNumber')
+
+    acute_mi_statements = set([821, 822, 823, 827, 829, 902, 903, 904, 963, 964, 965, 966, 967, 968])
+    acute_mi_classes = set()
+    for statement in acute_mi_statements:
+        if statement in df_sl_mapping.index:
+            acute_mi_classes.add(df_sl_mapping.loc[statement]['Acronym'])
 
     # Identify the header files.
     records = find_records(args.input_folder)
 
-    # Update the header files and copy the signal files.
+    # Update the header files to include demographics data and labels and copy the signal files unchanged.
     for record in records:
 
         # Extract the demographics data.
         record_path, record_basename = os.path.split(record)
         ecg_id = int(record_basename.split('_')[0])
-        row = df.loc[ecg_id]
+        row = df_ptbxl_database.loc[ecg_id]
 
         recording_date_string = row['recording_date']
         date_string, time_string = recording_date_string.split(' ')
@@ -64,12 +95,39 @@ def run(args):
         weight = row['weight']
         weight = cast_int_float_unknown(weight)
 
-        # Extract the diagnostic superclasses.
-        scp_codes = row['scp_codes']
-        if 'NORM' in scp_codes:
-            dx = 'Normal'
+        scp_code_dict = row['scp_codes']
+        scp_codes = [scp_code for scp_code in scp_code_dict if scp_code_dict[scp_code] >= 0]
+        superclasses = row['diagnostic_superclass']
+
+        if ecg_id in df_sl_database.index:
+            sl_codes = df_sl_database.loc[ecg_id]['statements']
         else:
-            dx = 'Abnormal'
+            sl_codes = list()
+
+        labels = list()
+        if 'NORM' in superclasses:
+            labels.append('NORM')
+        if any(c in sl_codes for c in acute_mi_classes):
+            labels.append('Acute MI')
+        if 'MI' in superclasses and not any(c in sl_codes for c in acute_mi_classes):
+            labels.append('Old MI')      
+        if 'STTC' in superclasses:
+            labels.append('STTC')
+        if 'CD' in superclasses:
+            labels.append('CD')
+        if 'HYP' in superclasses:
+            labels.append('HYP')
+        if 'PAC' in scp_codes:
+            labels.append('PAC')
+        if 'PVC' in scp_codes:
+            labels.append('PVC')
+        if 'AFIB' in scp_codes or 'AFLT' in scp_codes:
+            labels.append('AFIB/AFL')
+        if 'STACH' in scp_codes or 'SVTAC' in scp_codes or 'PSVT' in scp_codes:
+            labels.append('TACHY')
+        if 'SBRAD' in scp_codes:
+            labels.append('BRADY') 
+        labels = ', '.join(labels)
 
         # Update the header file.
         input_header_file = os.path.join(args.input_folder, record + '.hea')
@@ -88,11 +146,11 @@ def run(args):
         signal_lines = '\n'.join(l.strip() for l in lines[1:] \
             if l.strip() and not l.startswith('#')) + '\n'
         comment_lines = '\n'.join(l.strip() for l in lines[1:] \
-            if l.startswith('#') and not any((l.startswith(x) for x in ('#Age:', '#Sex:', '#Height:', '#Weight:', '#Dx:')))) + '\n'
+            if l.startswith('#') and not any((l.startswith(x) for x in ('# Age:', '# Sex:', '# Height:', '# Weight:', f'{substring_labels}')))) + '\n'
 
         record_line = record_line.strip() + f' {time_string} {date_string} ' + '\n'
         signal_lines = signal_lines.strip() + '\n'
-        comment_lines = comment_lines.strip() + f'#Age: {age}\n#Sex: {sex}\n#Height: {height}\n#Weight: {weight}\n#Dx: {dx}\n'
+        comment_lines = comment_lines.strip() + f'# Age: {age}\n# Sex: {sex}\n# Height: {height}\n# Weight: {weight}\n{substring_labels} {labels}\n'
 
         output_header = record_line + signal_lines + comment_lines
 

@@ -2,11 +2,17 @@
 
 # Do *not* edit this script.
 # These are helper functions that you can use with your code.
-# Check the example code to see how to import these functions to your code.
+# Check the example code to see how to use these functions in your code.
 
 import numpy as np
 import os
 import sys
+import wfdb
+
+### Challenge variables
+substring_labels = '# Labels:'
+substring_images = '# Image:'
+substring_image_annotations = '# Image annotations:'
 
 ### Challenge data I/O functions
 
@@ -28,10 +34,8 @@ def load_header(record):
     header = load_text(header_file)
     return header
 
-# Load the signal(s) for a record.
-def load_signal(record):
-    import wfdb
-
+# Load the signals for a record.
+def load_signals(record):
     signal_files = get_signal_files(record)
     if signal_files:
         signal, fields = wfdb.rdsamp(record)
@@ -39,12 +43,8 @@ def load_signal(record):
         signal, fields = None, None
     return signal, fields
 
-# Load the signal(s) for a record.
-def load_signals(record):
-    return load_signal(record)
-
-# Load the image(s) for a record.
-def load_image(record):
+# Load the images for a record.
+def load_images(record):
     from PIL import Image
 
     path = os.path.split(record)[0]
@@ -59,26 +59,19 @@ def load_image(record):
 
     return images
 
-# Load the image(s) for a record.
-def load_images(record):
-    return load_image(record)
-
-# Load the dx class(es) for a record.
-def load_dx(record):
+# Load the labels for a record.
+def load_labels(record):
     header = load_header(record)
-    dx = get_dxs_from_header(header)
-    return dx
-
-def load_dxs(record):
-    return load_dx(record)
+    labels = get_labels_from_header(header)
+    return labels
 
 # Save the header for a record.
 def save_header(record, header):
     header_file = get_header_file(record)
     save_text(header_file, header)
 
-# Save the signal(s) for a record.
-def save_signal(record, signal, comments=list()):
+# Save the signals for a record.
+def save_signals(record, signal, comments=list()):
     header = load_header(record)
     path, record = os.path.split(record)
     sampling_frequency = get_sampling_frequency(header)
@@ -87,33 +80,19 @@ def save_signal(record, signal, comments=list()):
     baselines = get_baselines(header)
     signal_units = get_signal_units(header)
     signal_names = get_signal_names(header)
+    comments = [comment.replace('#', '').strip() for comment in comments]
 
-    if all(signal_format == '16' for signal_format in signal_formats):
-        signal = np.clip(signal, -2**15 + 1, 2**15 - 1)
-        signal = np.asarray(signal, dtype=np.int16)
-    else:
-        signal_format_string = ', '.join(sorted(set(signal_formats)))
-        raise NotImplementedError(f'{signal_format_string} not implemented')
-
-    import wfdb
     wfdb.wrsamp(record, fs=sampling_frequency, units=signal_units, sig_name=signal_names, \
-                d_signal=signal, fmt=signal_formats, adc_gain=adc_gains, baseline=baselines, comments=comments, \
+                p_signal=signal, fmt=signal_formats, adc_gain=adc_gains, baseline=baselines, comments=comments,
                 write_dir=path)
 
-# Save the signal(s) for a record.
-def save_signals(record, signals):
-    save_signal(record, signals)
-
-# Save the dx class(es) for a record.
-def save_dx(record, dx):
+# Save the labels for a record.
+def save_labels(record, labels):
     header_file = get_header_file(record)
     header = load_text(header_file)
-    header += '#Dx: ' + ', '.join(dx) + '\n'
+    header += substring_labels + ' ' + ', '.join(labels) + '\n'
     save_text(header_file, header)
     return header
-
-def save_dxs(record, dxs):
-    return save_dx(record, dxs)
 
 ### Helper Challenge functions
 
@@ -148,7 +127,7 @@ def get_variables(string, variable_name, sep=','):
             has_variable = True
     return variables, has_variable
 
-# Get the signal file(s) from a header or a similar string.
+# Get the signal files from a header or a similar string.
 def get_signal_files_from_header(string):
     signal_files = list()
     for i, l in enumerate(string.split('\n')):
@@ -163,19 +142,26 @@ def get_signal_files_from_header(string):
             break
     return signal_files
 
-# Get the image file(s) from a header or a similar string.
+# Get the image files from a header or a similar string.
 def get_image_files_from_header(string):
-    images, has_image = get_variables(string, '#Image:')
+    images, has_image = get_variables(string, substring_images)
     if not has_image:
         raise Exception('No images available: did you forget to generate or include the images?')
     return images
 
-# Get the dx class(es) from a header or a similar string.
-def get_dxs_from_header(string):
-    dxs, has_dx = get_variables(string, '#Dx:')
-    if not has_dx:
-        raise Exception('No dx classes available: are you trying to load the classes from the held-out dataset, or did you forget to prepare the data to include the classes?')
-    return dxs
+# Get the image files from a header or a similar string.
+def get_image_annotation_files_from_header(string):
+    image_annotations, has_image_annotations = get_variables(string, substring_image_annotations)
+    if not has_image_annotations:
+        raise Exception('No image annotations available: did you forget to generate or include the image annotations?')
+    return image_annotations
+
+# Get the labels from a header or a similar string.
+def get_labels_from_header(string):
+    labels, has_labels = get_variables(string, substring_labels)
+    if not has_labels:
+        raise Exception('No labels available: are you trying to load the labels from the held-out data, or did you forget to prepare the data to include the labels?')
+    return labels
 
 # Get the header file for a record.
 def get_header_file(record):
@@ -185,19 +171,26 @@ def get_header_file(record):
         header_file = record
     return header_file
 
-# Get the signal file(s) for a record.
+# Get the signal files for a record.
 def get_signal_files(record):
     header_file = get_header_file(record)
     header = load_text(header_file)
     signal_files = get_signal_files_from_header(header)
     return signal_files
 
-# Get the image file(s) for a record.
+# Get the image files for a record.
 def get_image_files(record):
     header_file = get_header_file(record)
     header = load_text(header_file)
     image_files = get_image_files_from_header(header)
     return image_files
+
+# Get the image files for a record.
+def get_image_annotation_files(record):
+    header_file = get_header_file(record)
+    header = load_text(header_file)
+    image_annotation_files = get_image_annotation_files_from_header(header)
+    return image_annotation_files
 
 ### WFDB functions
 

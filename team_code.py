@@ -23,25 +23,33 @@ from helper_code import *
 #
 ################################################################################
 
+# Train your models. This function is *required*. You should edit this function to add your code, but do *not* change the arguments
+# of this function. If you do not train one of the models, then you can return None for the model.
+
 # Train your digitization model.
-def train_digitization_model(data_folder, model_folder, verbose):
-    # Find data files.
+def train_models(data_folder, model_folder, verbose):
+    # Find the data files.
+    if verbose:
+        print('Finding the Challenge data...')
+
+    records = find_records(data_folder)
+    num_records = len(records)
+
+    if num_records == 0:
+        raise FileNotFoundError('No data were provided.')
+
     if verbose:
         print('Training the digitization model...')
-        print('Finding the Challenge data...')
 
-    records = find_records(data_folder)
-    num_records = len(records)
-
-    if num_records == 0:
-        raise FileNotFoundError('No data was provided.')
-
-    # Extract the features and labels.
+    # Extract the features and labels from the data.
     if verbose:
         print('Extracting features and labels from the data...')
 
-    features = list()
+    digitization_features = list()
+    classification_features = list()
+    classification_labels = list()
 
+    # Iterate over the records.
     for i in range(num_records):
         if verbose:
             width = len(str(num_records))
@@ -49,71 +57,35 @@ def train_digitization_model(data_folder, model_folder, verbose):
 
         record = os.path.join(data_folder, records[i])
 
-        # Extract the features from the image...
-        current_features = extract_features(record)
-        features.append(current_features)
+        # Extract the features from the image; this simple example uses the same features for the digitization and classification
+        # tasks.
+        features = extract_features(record)
+        
+        digitization_features.append(features)
 
-    # Train the model.
-    if verbose:
-        print('Training the model on the data...')
+        # Some images may not be labeled...
+        labels = load_labels(record)
+        if labels:
+            classification_features.append(features)
+            classification_labels.append(labels)
 
-    # This overly simple model uses the mean of these overly simple features as a seed for a random number generator.
-    model = np.mean(features)
-
-    # Create a folder for the model if it does not already exist.
-    os.makedirs(model_folder, exist_ok=True)
-
-    # Save the model.
-    save_digitization_model(model_folder, model)
-
-    if verbose:
-        print('Done.')
-        print()
-
-# Train your dx classification model.
-def train_dx_model(data_folder, model_folder, verbose):
-    # Find data files.
-    if verbose:
-        print('Training the dx classification model...')
-        print('Finding the Challenge data...')
-
-    records = find_records(data_folder)
-    num_records = len(records)
-
-    if num_records == 0:
-        raise FileNotFoundError('No data was provided.')
-
-    # Extract the features and labels.
-    if verbose:
-        print('Extracting features and labels from the data...')
-
-    features = list()
-    dxs = list()
-
-    for i in range(num_records):
-        if verbose:
-            width = len(str(num_records))
-            print(f'- {i+1:>{width}}/{num_records}: {records[i]}...')
-
-        record = os.path.join(data_folder, records[i])
-
-        # Extract the features from the image, but only if the image has one or more dx classes.
-        dx = load_dx(record)
-        if dx:
-            current_features = extract_features(record)
-            features.append(current_features)
-            dxs.append(dx)
-
-    if not dxs:
+    # ... but we expect some images to be labeled for classification.
+    if not classification_labels:
         raise Exception('There are no labels for the data.')
 
-    features = np.vstack(features)
-    classes = sorted(set.union(*map(set, dxs)))
-    dxs = compute_one_hot_encoding(dxs, classes)
-
-    # Train the model.
+    # Train the models.
     if verbose:
-        print('Training the model on the data...')
+        print('Training the models on the data...')
+
+    # Train the digitization model. This very simple model uses the mean of these very simple features as a seed for a random number
+    # generator.
+    digitization_model = np.mean(features)
+
+    # Train the classification model. This very simple model trains a random forest model with these very simple features.
+
+    classification_features = np.vstack(classification_features)
+    classes = sorted(set.union(*map(set, classification_labels)))
+    classification_labels = compute_one_hot_encoding(classification_labels, classes)
 
     # Define parameters for random forest classifier and regressor.
     n_estimators   = 12  # Number of trees in the forest.
@@ -121,34 +93,33 @@ def train_dx_model(data_folder, model_folder, verbose):
     random_state   = 56  # Random state; set for reproducibility.
 
     # Fit the model.
-    model = RandomForestClassifier(
-        n_estimators=n_estimators, max_leaf_nodes=max_leaf_nodes, random_state=random_state).fit(features, dxs)
+    classification_model = RandomForestClassifier(
+        n_estimators=n_estimators, max_leaf_nodes=max_leaf_nodes, random_state=random_state).fit(classification_features, classification_labels)
 
-    # Create a folder for the model if it does not already exist.
+    # Create a folder for the models if it does not already exist.
     os.makedirs(model_folder, exist_ok=True)
 
-    # Save the model.
-    save_dx_model(model_folder, model, classes)
+    # Save the models.
+    save_models(model_folder, digitization_model, classification_model, classes)
 
     if verbose:
         print('Done.')
         print()
 
-# Load your trained digitization model. This function is *required*. You should edit this function to add your code, but do *not*
-# change the arguments of this function. If you do not train a digitization model, then you can return None.
-def load_digitization_model(model_folder, verbose):
-    filename = os.path.join(model_folder, 'digitization_model.sav')
-    return joblib.load(filename)
+# Load your trained models. This function is *required*. You should edit this function to add your code, but do *not* change the
+# arguments of this function. If you do not train one of the models, then you can return None for the model.
+def load_models(model_folder, verbose):
+    digitization_filename = os.path.join(model_folder, 'digitization_model.sav')
+    digitization_model = joblib.load(digitization_filename)
 
-# Load your trained dx classification model. This function is *required*. You should edit this function to add your code, but do
-# *not* change the arguments of this function. If you do not train a dx classification model, then you can return None.
-def load_dx_model(model_folder, verbose):
-    filename = os.path.join(model_folder, 'dx_model.sav')
-    return joblib.load(filename)
+    classification_filename = os.path.join(model_folder, 'classification_model.sav')
+    classification_model = joblib.load(classification_filename)
+    return digitization_model, classification_model
 
 # Run your trained digitization model. This function is *required*. You should edit this function to add your code, but do *not*
-# change the arguments of this function.
-def run_digitization_model(digitization_model, record, verbose):
+# change the arguments of this function. If you did not train one of the models, then you can return None for the model.
+def run_models(record, digitization_model, classification_model, verbose):
+    # Run the digitization model; if you did not train this model, then you can set signal = None.
     model = digitization_model['model']
 
     # Extract features.
@@ -161,18 +132,13 @@ def run_digitization_model(digitization_model, record, verbose):
     num_samples = get_num_samples(header)
     num_signals = get_num_signals(header)
 
-    # For a overly simply minimal working example, generate "random" waveforms.
+    # Generate "random" waveforms using the a random seed from the feature.
     seed = int(round(model + np.mean(features)))
-    signal = np.random.default_rng(seed=seed).uniform(low=-1000, high=1000, size=(num_samples, num_signals))
-    signal = np.asarray(signal, dtype=np.int16)
-
-    return signal
-
-# Run your trained dx classification model. This function is *required*. You should edit this function to add your code, but do
-# *not* change the arguments of this function.
-def run_dx_model(dx_model, record, signal, verbose):
-    model = dx_model['model']
-    classes = dx_model['classes']
+    signal = np.random.default_rng(seed=seed).uniform(low=-1, high=1, size=(num_samples, num_signals))
+    
+    # Run the classification model.
+    model = classification_model['model']
+    classes = classification_model['classes']
 
     # Extract features.
     features = extract_features(record)
@@ -182,11 +148,11 @@ def run_dx_model(dx_model, record, signal, verbose):
     probabilities = model.predict_proba(features)
     probabilities = np.asarray(probabilities, dtype=np.float32)[:, 0, 1]
 
-    # Choose the class(es) with the highest probability as the label(s).
+    # Choose the class or classes with the highest probability as the label or labels.
     max_probability = np.nanmax(probabilities)
     labels = [classes[i] for i, probability in enumerate(probabilities) if probability == max_probability]
 
-    return labels
+    return signal, labels
 
 ################################################################################
 #
@@ -196,7 +162,7 @@ def run_dx_model(dx_model, record, signal, verbose):
 
 # Extract features.
 def extract_features(record):
-    images = load_image(record)
+    images = load_images(record)
     mean = 0.0
     std = 0.0
     for image in images:
@@ -205,14 +171,14 @@ def extract_features(record):
         std += np.std(image)
     return np.array([mean, std])
 
-# Save your trained digitization model.
-def save_digitization_model(model_folder, model):
-    d = {'model': model}
-    filename = os.path.join(model_folder, 'digitization_model.sav')
-    joblib.dump(d, filename, protocol=0)
+# Save your trained models.
+def save_models(model_folder, digitization_model=None, classification_model=None, classes=None):
+    if digitization_model is not None:
+        d = {'model': digitization_model}
+        filename = os.path.join(model_folder, 'digitization_model.sav')
+        joblib.dump(d, filename, protocol=0)
 
-# Save your trained dx classification model.
-def save_dx_model(model_folder, model, classes):
-    d = {'model': model, 'classes': classes}
-    filename = os.path.join(model_folder, 'dx_model.sav')
-    joblib.dump(d, filename, protocol=0)
+    if classification_model is not None:
+        d = {'model': classification_model, 'classes': classes}
+        filename = os.path.join(model_folder, 'classification_model.sav')
+        joblib.dump(d, filename, protocol=0)

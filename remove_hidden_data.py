@@ -15,7 +15,9 @@ def get_parser():
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-i', '--input_folder', type=str, required=True)
     parser.add_argument('-w', '--include_waveforms', action='store_true')
-    parser.add_argument('-d', '--include_dxs', action='store_true')
+    parser.add_argument('-l', '--include_labels', action='store_true')
+    parser.add_argument('-m', '--include_images', action='store_true')
+    parser.add_argument('-n', '--include_image_annotations', action='store_true')        
     parser.add_argument('-o', '--output_folder', type=str, required=True)
     return parser
 
@@ -41,11 +43,15 @@ def run(args):
                 output_header += ' '.join(arrs[:4]) + '\n'
             elif 1 <= i <= num_signals:
                 output_header += ' '.join(arrs[:5] + ['', '', ''] + [arrs[8]]) + '\n'
-            elif l.startswith('#Dx:'):
-                if args.include_dxs:
+            elif l.startswith(substring_labels):
+                if args.include_labels:
                     output_header += l + '\n'
-            elif l.startswith('#Image:'):
-                output_header += l + '\n'
+            elif l.startswith(substring_images):
+                if args.include_images:                
+                    output_header += l + '\n'
+            elif l.startswith(substring_image_annotations):
+                if args.include_image_annotations:                  
+                    output_header += l + '\n'
 
         input_path = os.path.join(args.input_folder, record_path)
         output_path = os.path.join(args.output_folder, record_path)
@@ -72,12 +78,21 @@ def run(args):
                 if os.path.isfile(output_signal_file):
                     os.remove(output_signal_file)
 
-        image_files = get_image_files(input_header_file)
-        for image_file in image_files:
-            input_image_file = os.path.join(args.input_folder, relative_path, image_file)
-            output_image_file = os.path.join(args.output_folder, relative_path, image_file)
-            if os.path.isfile(input_image_file):
-                shutil.copy2(input_image_file, output_image_file)
+        if args.include_images:
+            image_files = get_image_files(input_header_file)
+            for image_file in image_files:
+                input_image_file = os.path.join(args.input_folder, relative_path, image_file)
+                output_image_file = os.path.join(args.output_folder, relative_path, image_file)
+                if os.path.isfile(input_image_file):
+                    shutil.copy2(input_image_file, output_image_file)
+
+        if args.include_image_annotations:
+            image_annotation_files = get_image_files(input_header_file)
+            for image_annotation_file in image_annotation_files:
+                input_image_annotation_file = os.path.join(args.input_folder, relative_path, image_annotation_file)
+                output_image_annotation_file = os.path.join(args.output_folder, relative_path, image_annotation_file)
+                if os.path.isfile(input_image_annotation_file):
+                    shutil.copy2(input_image_annotation_file, output_image_annotation_file)
 
 if __name__=='__main__':
     run(get_parser().parse_args(sys.argv[1:]))
