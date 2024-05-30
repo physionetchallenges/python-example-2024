@@ -71,7 +71,7 @@ You can use the scripts in this repository to generate synthetic ECG images for 
             -i ptb-xl/records500/00000 \
             -o ptb-xl/records500/00000 \
             --print_header \
-            --store_config 2
+            --store_config 1
 
 4. Add the file locations and other information for the synthetic ECG images to the WFDB header files. (The expected image filenames for record `12345` are of the form `12345-0.png`, `12345-1.png`, etc., which should be in the same folder.) You can use the `ptb-xl/records500/00000` folder for the `train_model` step:
 
