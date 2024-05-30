@@ -38,12 +38,11 @@ def find_files(folder, extensions, remove_extension=False, sort=False):
 def run(args):
     # Define variables.
     image_file_types = ['.png', '.jpg', '.jpeg']
-    annotation_file_types = ['.json']
 
     # Find the header files.
     records = find_records(args.input_folder)
 
-    # Find the image and annotation files.
+    # Find the image files.
     image_files = find_files(args.input_folder, image_file_types)
     record_to_image_files = defaultdict(set)
     for image_file in image_files:
@@ -52,19 +51,10 @@ def run(args):
         basename = os.path.basename(image_file)
         record_to_image_files[record].add(basename)
 
-    annotation_files = find_files(args.input_folder, annotation_file_types)
-    record_to_annotation_files = defaultdict(set)
-    for annotation_file in annotation_files:
-        root, ext = os.path.splitext(annotation_file)
-        record = '-'.join(root.split('-')[:-1])
-        basename = os.path.basename(annotation_file)
-        record_to_annotation_files[record].add(basename)
-
     # Update the header files and copy signal files.
     for record in records:
         record_path, record_basename = os.path.split(record)
         record_image_files = record_to_image_files[record]
-        record_annotation_files = record_to_annotation_files[record]
 
         # Sort the images numerically if numerical and alphanumerically otherwise.
         record_suffixes = [os.path.splitext(image_file)[0].split('-')[-1] for image_file in record_image_files]
@@ -73,17 +63,6 @@ def run(args):
         else:
             record_image_files = sorted(record_image_files)
         
-        sorted_record_annotation_files = list()
-        for image_file in record_image_files:
-            image_root, image_ext = os.path.splitext(image_file)
-            match = ''
-            for annotation_file in record_annotation_files:
-                annotation_root, annotation_ext = os.path.splitext(annotation_file)
-                if image_root == annotation_root:
-                    match = annotation_file
-            sorted_record_annotation_files.append(match)
-        record_annotation_files = sorted_record_annotation_files
-
         # Update the header files.
         input_header_file = os.path.join(args.input_folder, record + '.hea')
         output_header_file = os.path.join(args.output_folder, record + '.hea')
@@ -91,14 +70,11 @@ def run(args):
         input_header = load_text(input_header_file)
         output_header = ''
         for l in input_header.split('\n'):
-            if not l.startswith(substring_images) and not l.startswith(substring_image_annotations) and l:
+            if not l.startswith(substring_images) and l:
                 output_header += l + '\n'
 
         record_image_string = ', '.join(record_image_files)
         output_header += f'{substring_images} {record_image_string}\n'
-
-        record_annotation_string = ', '.join(record_annotation_files)
-        output_header += f'{substring_image_annotations} {record_annotation_string}\n'
 
         input_path = os.path.join(args.input_folder, record_path)
         output_path = os.path.join(args.output_folder, record_path)
@@ -125,13 +101,6 @@ def run(args):
                 input_image_file = os.path.join(args.input_folder, relative_path, image_file)
                 output_image_file = os.path.join(args.output_folder, relative_path, image_file)
                 if os.path.isfile(input_image_file):
-                    shutil.copy2(input_image_file, output_image_file)
-
-            image_annotation_files = get_image_annotation_files(output_header_file)
-            for image_annotation_file in image_annotation_files:
-                input_image_annotation_file = os.path.join(args.input_folder, relative_path, image_annotation_file)
-                output_image_annotation_file = os.path.join(args.output_folder, relative_path, image_annotation_file)
-                if os.path.isfile(input_image_annotation_file):
                     shutil.copy2(input_image_file, output_image_file)
 
 if __name__=='__main__':
