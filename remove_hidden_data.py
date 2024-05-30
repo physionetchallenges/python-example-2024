@@ -82,13 +82,5 @@ def run(args):
                 if os.path.isfile(input_image_file):
                     shutil.copy2(input_image_file, output_image_file)
 
-        if args.include_image_annotations:
-            image_annotation_files = get_image_files(input_header_file)
-            for image_annotation_file in image_annotation_files:
-                input_image_annotation_file = os.path.join(args.input_folder, relative_path, image_annotation_file)
-                output_image_annotation_file = os.path.join(args.output_folder, relative_path, image_annotation_file)
-                if os.path.isfile(input_image_annotation_file):
-                    shutil.copy2(input_image_annotation_file, output_image_annotation_file)
-
 if __name__=='__main__':
     run(get_parser().parse_args(sys.argv[1:]))
