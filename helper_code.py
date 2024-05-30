@@ -12,7 +12,6 @@ import wfdb
 ### Challenge variables
 substring_labels = '# Labels:'
 substring_images = '# Image:'
-substring_image_annotations = '# Image annotations:'
 
 ### Challenge data I/O functions
 
@@ -149,13 +148,6 @@ def get_image_files_from_header(string):
         raise Exception('No images available: did you forget to generate or include the images?')
     return images
 
-# Get the image files from a header or a similar string.
-def get_image_annotation_files_from_header(string):
-    image_annotations, has_image_annotations = get_variables(string, substring_image_annotations)
-    if not has_image_annotations:
-        raise Exception('No image annotations available: did you forget to generate or include the image annotations?')
-    return image_annotations
-
 # Get the labels from a header or a similar string.
 def get_labels_from_header(string):
     labels, has_labels = get_variables(string, substring_labels)
@@ -184,13 +176,6 @@ def get_image_files(record):
     header = load_text(header_file)
     image_files = get_image_files_from_header(header)
     return image_files
-
-# Get the image files for a record.
-def get_image_annotation_files(record):
-    header_file = get_header_file(record)
-    header = load_text(header_file)
-    image_annotation_files = get_image_annotation_files_from_header(header)
-    return image_annotation_files
 
 ### WFDB functions
 

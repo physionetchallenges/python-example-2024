@@ -17,7 +17,6 @@ def get_parser():
     parser.add_argument('-w', '--include_waveforms', action='store_true')
     parser.add_argument('-l', '--include_labels', action='store_true')
     parser.add_argument('-m', '--include_images', action='store_true')
-    parser.add_argument('-n', '--include_image_annotations', action='store_true')        
     parser.add_argument('-o', '--output_folder', type=str, required=True)
     return parser
 
@@ -48,9 +47,6 @@ def run(args):
                     output_header += l + '\n'
             elif l.startswith(substring_images):
                 if args.include_images:                
-                    output_header += l + '\n'
-            elif l.startswith(substring_image_annotations):
-                if args.include_image_annotations:                  
                     output_header += l + '\n'
 
         input_path = os.path.join(args.input_folder, record_path)
