@@ -132,6 +132,10 @@ def run_models(record, digitization_model, classification_model, verbose):
     num_samples = get_num_samples(header)
     num_signals = get_num_signals(header)
 
+    # Extract features.
+    features = extract_features(record)
+    features = features.reshape(1, -1)
+    
     # Generate "random" waveforms using the a random seed from the feature.
     seed = int(round(model + np.mean(features)))
     signal = np.random.default_rng(seed=seed).uniform(low=-1, high=1, size=(num_samples, num_signals))
@@ -140,9 +144,7 @@ def run_models(record, digitization_model, classification_model, verbose):
     model = classification_model['model']
     classes = classification_model['classes']
 
-    # Extract features.
-    features = extract_features(record)
-    features = features.reshape(1, -1)
+
 
     # Get model probabilities.
     probabilities = model.predict_proba(features)
