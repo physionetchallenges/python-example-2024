@@ -67,7 +67,7 @@ def train_models(data_folder, model_folder, verbose):
 
         # Some images may not be labeled...
         labels = load_labels(record)
-        if labels:
+        if any(label for label in labels):
             classification_features.append(features)
             classification_labels.append(labels)
 
