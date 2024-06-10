@@ -38,6 +38,8 @@ def train_models(data_folder, model_folder, verbose):
     if num_records == 0:
         raise FileNotFoundError('No data were provided.')
 
+    # Train the digitization model. If you are not training a digitization model, then you can remove this part of the code.
+
     if verbose:
         print('Training the digitization model...')
 
@@ -81,8 +83,9 @@ def train_models(data_folder, model_folder, verbose):
     # generator.
     digitization_model = np.mean(features)
 
-    # Train the classification model. This very simple model trains a random forest model with these very simple features.
-
+    # Train the classification model. If you are not training a classification model, then you can remove this part of the code.
+    
+    # This very simple model trains a random forest model with these very simple features.
     classification_features = np.vstack(classification_features)
     classes = sorted(set.union(*map(set, classification_labels)))
     classification_labels = compute_one_hot_encoding(classification_labels, classes)
@@ -120,10 +123,9 @@ def load_models(model_folder, verbose):
 # change the arguments of this function. If you did not train one of the models, then you can return None for the model.
 def run_models(record, digitization_model, classification_model, verbose):
     # Run the digitization model; if you did not train this model, then you can set signal = None.
-    model = digitization_model['model']
 
-    # Extract features.
-    features = extract_features(record)
+    # Load the digitization model.
+    model = digitization_model['model']
 
     # Load the dimensions of the signal.
     header_file = get_header_file(record)
@@ -132,19 +134,21 @@ def run_models(record, digitization_model, classification_model, verbose):
     num_samples = get_num_samples(header)
     num_signals = get_num_signals(header)
 
-    # Generate "random" waveforms using the a random seed from the feature.
-    seed = int(round(model + np.mean(features)))
-    signal = np.random.default_rng(seed=seed).uniform(low=-1, high=1, size=(num_samples, num_signals))
-    
-    # Run the classification model.
-    model = classification_model['model']
-    classes = classification_model['classes']
-
-    # Extract features.
+    # Extract the features.
     features = extract_features(record)
     features = features.reshape(1, -1)
 
-    # Get model probabilities.
+    # Generate "random" waveforms using the a random seed from the features.
+    seed = int(round(model + np.mean(features)))
+    signal = np.random.default_rng(seed=seed).uniform(low=-1, high=1, size=(num_samples, num_signals))
+    
+    # Run the classification model; if you did not train this model, then you can set labels = None.
+
+    # Load the classification model and classes.
+    model = classification_model['model']
+    classes = classification_model['classes']
+
+    # Get the model probabilities.
     probabilities = model.predict_proba(features)
     probabilities = np.asarray(probabilities, dtype=np.float32)[:, 0, 1]
 
