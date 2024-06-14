@@ -69,7 +69,7 @@ def run(args):
             if args.allow_failures:
                 if args.verbose:
                     print('... failed.')
-                signal = None
+                signals = None
                 labels = None
             else:
                 raise

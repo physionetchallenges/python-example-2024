@@ -36,7 +36,9 @@ def load_header(record):
 # Load the signals for a record.
 def load_signals(record):
     signal_files = get_signal_files(record)
-    if signal_files:
+    path = os.path.split(record)[0]
+    signal_files_exist = all(os.path.isfile(os.path.join(path, signal_file)) for signal_file in signal_files)
+    if signal_files and signal_files_exist:
         signal, fields = wfdb.rdsamp(record)
     else:
         signal, fields = None, None
