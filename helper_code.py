@@ -6,8 +6,12 @@
 
 import numpy as np
 import os
+import scipy as sp
 import sys
 import wfdb
+
+from scipy.signal import fftconvolve
+from scipy.ndimage import gaussian_filter
 
 ### Challenge variables
 substring_labels = '# Labels:'
@@ -389,6 +393,16 @@ def compute_f_measure(labels, outputs):
 
     return macro_f_measure, per_class_f_measure, classes
 
+# Normalize the channel names.
+def normalize_names(names_ref, names_est):
+    tmp = list()
+    for a in names_est:
+        for b in names_ref:
+            if a.casefold() == b.casefold():
+                tmp.append(b)
+                break
+    return tmp
+
 # Reorder channels in signal.
 def reorder_signal(input_signal, input_channels, output_channels):
     # Do not allow repeated channels with potentially different values in a signal.
@@ -398,15 +412,14 @@ def reorder_signal(input_signal, input_channels, output_channels):
     if input_channels == output_channels:
         output_signal = input_signal
     else:
-        input_channels = [channel.strip().casefold() for channel in input_channels]
-        output_channels = [channel.strip().casefold() for channel in output_channels]
+        output_channels = normalize_names(input_channels, output_channels)
 
         input_signal = np.asarray(input_signal)
         num_samples = np.shape(input_signal)[0]
         num_channels = len(output_channels)
         data_type = input_signal.dtype
-        output_signal = np.zeros((num_samples, num_channels), dtype=data_type)
 
+        output_signal = np.zeros((num_samples, num_channels), dtype=data_type)
         for i, output_channel in enumerate(output_channels):
             for j, input_channel in enumerate(input_channels):
                 if input_channel == output_channel:
@@ -414,159 +427,250 @@ def reorder_signal(input_signal, input_channels, output_channels):
 
     return output_signal
 
-# Pad or truncate signal.
-def trim_signal(input_signal, num_samples_trimmed):
-    input_signal = np.asarray(input_signal)
-    num_samples, num_channels = np.shape(input_signal)
-    data_type = input_signal.dtype
+# Quantize the 1D signal amplitudes to convert the 1D real-valued signal to a 2D binarized signal.
+def convert_signal(x, num_quant_levels, min_amp, max_amp, max_t):
+    idx = np.isfinite(x)
 
-    if num_samples == num_samples_trimmed:
-        output_signal = input_signal
+    t = np.arange(1, np.size(x) + 1)
+    t = t[idx]
+
+    y = x[idx]
+    y = np.round((num_quant_levels - 1) * (y - min_amp) / (max_amp - min_amp) + 1).astype(int)
+    y = np.clip(y, 1, num_quant_levels)
+
+    A = np.zeros((num_quant_levels, max_t))
+    A[y - 1, t - 1] = 1
+    return A
+
+# Correlate the 2D signals in the spectral domain.
+def fft_correlate(A_ref, A_est):
+    # Flip the digitized signal for correlation. 
+    A_est_flipped = np.flip(np.flip(A_est, axis=0), axis=1)
+    return fftconvolve(A_ref, A_est_flipped, mode='full')
+
+def align_signals(x_ref, x_est, num_quant_levels, smooth=True, sigma=0.5):
+    # Estimate the vertical and horizontal offsets of the estimated signal vs. a reference signal
+    # in noisy conditions.
+    # Reza Sameni, Zuzana Koscova, Matthew Reyna, July 2024
+
+    # Summarize the durations and amplitudes of the signals.
+    min_amp = min(np.nanmin(x_ref), np.nanmin(x_est))
+    max_amp = max(np.nanmax(x_ref), np.nanmax(x_est))
+    max_t = max(np.size(x_ref), np.size(x_est))
+
+    # Quantize the 1D signal amplitudes to convert the 1D real-valued signals to 2D binarized signals.
+    A_ref = convert_signal(x_ref, num_quant_levels, min_amp, max_amp, max_t)
+    A_est = convert_signal(x_est, num_quant_levels, min_amp, max_amp, max_t)
+
+    # Apply Gaussian smoothing to the 2D binarized signals (optional).
+    if smooth:
+        A_ref = gaussian_filter(A_ref, sigma)
+        A_est = gaussian_filter(A_est, sigma)
+    
+    # Compute the cross-correlation of 2D reference and estimated signals in the spectral domain.
+    A_cross = fft_correlate(A_ref, A_est)
+    idx_cross = np.unravel_index(np.argmax(A_cross), A_cross.shape)
+                                 
+    # Compute the auto-correlation of the reference signal in the spectral domain.
+    A_auto = fft_correlate(A_ref, A_ref)
+    idx_auto = np.unravel_index(np.argmax(A_auto), A_auto.shape)
+   
+    # Estimate vertical and horizontal offsets from the cross-correlation peak lags.
+    offset_hz = idx_auto[1] - idx_cross[1]
+    offset_vt = idx_auto[0] - idx_cross[0]
+    offset_vt = offset_vt / (num_quant_levels - 1) * (max_amp - min_amp)
+
+    # Shift the estimated signal by the estimated offsets.
+    if offset_hz < 0:
+        x_est_shifted = np.concatenate((np.nan*np.ones(-offset_hz), x_est))
     else:
-        output_signal = np.zeros((num_samples_trimmed, num_channels), dtype=data_type)
-        if num_samples < num_samples_trimmed: # Zero-pad the signals.
-            output_signal[:num_samples, :] = input_signal
-        else: # Truncate the signals.
-            output_signal = input_signal[:num_samples_trimmed, :]
+        x_est_shifted = np.concatenate((x_est[offset_hz:], np.nan*np.ones(offset_hz)))
+    x_est_shifted -= offset_vt
 
-    return output_signal
+    return x_est_shifted, offset_hz, offset_vt
 
-# Compute SNR.
-def compute_snr(label_signal, output_signal):
-    label_signal = np.asarray(label_signal)
-    output_signal = np.asarray(output_signal)
+def compute_snr(x_ref, x_est, keep_nans=True, signal_median=False, noise_median=False):
+    # Check the reference and estimated signals.
+    x_ref = np.asarray(x_ref).copy()
+    x_est = np.asarray(x_est).copy()
+    assert(x_ref.ndim == x_est.ndim == 1)
 
-    assert(label_signal.ndim == output_signal.ndim == 1)
-    assert(np.size(label_signal) == np.size(output_signal))
+    # Pad the shorter signal with NaNs so that both signals have the same length.
+    n_ref = np.size(x_ref)
+    n_est = np.size(x_est)
+    if n_est < n_ref:
+        x_est = np.concatenate((x_est, np.nan*np.ones(n_ref - n_est)))
+    elif n_est > n_ref:
+        x_ref = np.concatenate((x_ref, np.nan*np.ones(n_est - n_ref)))
 
-    idx_finite_signal = np.isfinite(label_signal)
-    label_signal = label_signal[idx_finite_signal]
-    output_signal = output_signal[idx_finite_signal]
+    # Identify the samples with finite values, i.e., not NaN, +\infty, or -\infty.
+    idx_ref = np.isfinite(x_ref)
+    idx_est = np.isfinite(x_est) 
 
-    idx_nan_signal = np.isnan(output_signal)
-    output_signal[idx_nan_signal] = 0
+    # Either only consider samples with finite values in both signals (default) or replace the non-finite values in the estimated signal with zeros.
+    if keep_nans:
+        idx = np.logical_and(idx_ref, idx_est)
+    else:
+        x_est[~idx_est] = 0
+        idx = idx_ref
 
-    noise_signal = output_signal - label_signal
+    x_ref = x_ref[idx]
+    x_est = x_est[idx]
 
-    x = np.sum(label_signal**2)
-    y = np.sum(noise_signal**2)
+    # Compute the noise.
+    x_noise = x_ref - x_est
 
-    if x > 0 and y > 0:
-        snr = 10 * np.log10(x / y)
-    elif x > 0 and y == 0:
+    # Compute the power for the signal and the noise using either the mean (default) or the median.
+    if not signal_median:
+        p_signal = np.mean(x_ref**2)
+    else:
+        p_signal = np.median(x_ref**2)
+
+    if not noise_median:
+        p_noise = np.mean(x_noise**2)
+    else:
+        p_noise = np.median(x_noise**2)
+
+    # Compute the SNR.
+    if p_signal > 0 and p_noise > 0:
+        snr = 10 * np.log10(p_signal / p_noise)
+    elif p_noise == 0:
         snr = float('inf')
     else:
         snr = float('nan')
 
-    return snr
+    # If only considering the samples with finite values in both signals, then penalize the samples with non-finite values in the
+    # estimated signal but not in the reference signal.
+    if keep_nans:
+        alpha = np.sum(idx) / np.sum(idx_ref)
+        snr *= alpha
 
-# Compute the mean signal power to median noise power metric.
-def compute_snr_median(label_signal, output_signal):
-    label_signal = np.asarray(label_signal)
-    output_signal = np.asarray(output_signal)
-
-    assert(label_signal.ndim == output_signal.ndim == 1)
-    assert(np.size(label_signal) == np.size(output_signal))
-
-    idx_finite_signal = np.isfinite(label_signal)
-    label_signal = label_signal[idx_finite_signal]
-    output_signal = output_signal[idx_finite_signal]
-
-    idx_nan_signal = np.isnan(output_signal)
-    output_signal[idx_nan_signal] = 0
-
-    noise_signal = output_signal - label_signal
-
-    x = np.mean(label_signal**2)
-    y = np.median(noise_signal**2)
-
-    if y > 0:
-        snr = 10 * np.log10(x / y)
-    else:
-        snr = float('inf')
-
-    return snr
+    return snr, p_signal, p_noise
 
 # Compute a metric inspired by the Kolmogorov-Smirnov test statistic.
-def compute_ks_metric(label_signal, output_signal):
-    label_signal = np.asarray(label_signal)
-    output_signal = np.asarray(output_signal)
+def compute_ks_metric(x_ref, x_est, keep_nans=True):
+    # Check the reference and estimated signals.
+    x_ref = np.asarray(x_ref).copy()
+    x_est = np.asarray(x_est).copy()
+    assert(x_ref.ndim == x_est.ndim == 1)
 
-    assert(label_signal.ndim == output_signal.ndim == 1)
-    assert(np.size(label_signal) == np.size(output_signal))
+    # Pad the shorter signal with NaNs so that both signals have the same length.
+    n_ref = np.size(x_ref)
+    n_est = np.size(x_est)
+    if n_est < n_ref:
+        x_est = np.concatenate((x_est, np.nan*np.ones(n_ref - n_est)))
+    elif n_est > n_ref:
+        x_ref = np.concatenate((x_ref, np.nan*np.ones(n_est - n_ref)))
 
-    idx_finite_signal = np.isfinite(label_signal)
-    label_signal = label_signal[idx_finite_signal]
-    output_signal = output_signal[idx_finite_signal]
+     # Identify the samples with finite values, i.e., not NaN, +\infty, or -\infty.
+    idx_ref = np.isfinite(x_ref)
+    idx_est = np.isfinite(x_est) 
 
-    idx_nan_signal = np.isnan(output_signal)
-    output_signal[idx_nan_signal] = 0
+    # Either only consider samples with finite values in both signals (default) or replace the non-finite values in the estimated signal with zeros.
+    if keep_nans:
+        idx = np.logical_and(idx_ref, idx_est)
+    else:
+        x_est[~idx_est] = 0
+        idx = idx_ref
 
-    label_signal_cdf = np.cumsum(np.abs(label_signal))
-    output_signal_cdf = np.cumsum(np.abs(output_signal))
+    x_ref = x_ref[idx]
+    x_est = x_est[idx]
 
-    if label_signal_cdf[-1] > 0:
-        label_signal_cdf = label_signal_cdf / label_signal_cdf[-1]
-    if output_signal_cdf[-1] > 0:
-        output_signal_cdf = output_signal_cdf / output_signal_cdf[-1]
+    x_ref_cdf = np.nancumsum(np.abs(x_ref))
+    x_est_cdf = np.nancumsum(np.abs(x_est))
 
-    goodness_of_fit = 1.0 - np.max(np.abs(label_signal_cdf - output_signal_cdf))
+    if x_ref_cdf[-1] > 0:
+        x_ref_cdf = x_ref_cdf / x_ref_cdf[-1]
+    if x_est_cdf[-1] > 0:
+        x_est_cdf = x_est_cdf / x_est_cdf[-1]
+
+    goodness_of_fit = 1.0 - np.max(np.abs(x_ref_cdf - x_est_cdf))
 
     return goodness_of_fit
 
 # Compute the adaptive signed correlation index (ASCI) metric.
-def compute_asci_metric(label_signal, output_signal, beta=0.05):
-    label_signal = np.asarray(label_signal)
-    output_signal = np.asarray(output_signal)
+def compute_asci_metric(x_ref, x_est, beta=0.05, keep_nans=True):
+    # Check the reference and estimated signals.
+    x_ref = np.asarray(x_ref).copy()
+    x_est = np.asarray(x_est).copy()
+    assert(x_ref.ndim == x_est.ndim == 1)
 
-    assert(label_signal.ndim == output_signal.ndim == 1)
-    assert(np.size(label_signal) == np.size(output_signal))
+    # Pad the shorter signal with NaNs so that both signals have the same length.
+    n_ref = np.size(x_ref)
+    n_est = np.size(x_est)
+    if n_est < n_ref:
+        x_est = np.concatenate((x_est, np.nan*np.ones(n_ref - n_est)))
+    elif n_est > n_ref:
+        x_ref = np.concatenate((x_ref, np.nan*np.ones(n_est - n_ref)))
 
-    idx_finite_signal = np.isfinite(label_signal)
-    label_signal = label_signal[idx_finite_signal]
-    output_signal = output_signal[idx_finite_signal]
+    # Identify the samples with finite values, i.e., not NaN, +\infty, or -\infty.
+    idx_ref = np.isfinite(x_ref)
+    idx_est = np.isfinite(x_est) 
 
-    idx_nan_signal = np.isnan(output_signal)
-    output_signal[idx_nan_signal] = 0
+    # Either only consider samples with finite values in both signals (default) or replace the non-finite values in the estimated signal with zeros.
+    if keep_nans:
+        idx = np.logical_and(idx_ref, idx_est)
+    else:
+        x_est[~idx_est] = 0
+        idx = idx_ref
 
+    x_ref = x_ref[idx]
+    x_est = x_est[idx]
+
+    # Check the threshold parameter beta and discretize the nose.
     if beta <= 0 or beta > 1:
         raise ValueError('The beta value should be greater than 0 and less than or equal to 1.')
 
-    threshold = beta * np.std(label_signal)
+    threshold = beta * np.std(x_ref)
 
-    noise_signal = np.abs(label_signal - output_signal)
+    x_noise = np.abs(x_ref - x_est)
 
-    discrete_noise = np.zeros_like(noise_signal)
-    discrete_noise[noise_signal <= threshold] = 1
-    discrete_noise[noise_signal > threshold] = -1
+    x_noise_discretized = np.zeros_like(x_noise)
+    x_noise_discretized[x_noise <= threshold] = 1
+    x_noise_discretized[x_noise > threshold] = -1
 
-    asci = np.mean(discrete_noise)
+    asci = np.mean(x_noise_discretized)
 
     return asci
 
 # Compute a weighted absolute difference metric.
-def compute_weighted_absolute_difference(label_signal, output_signal, sampling_frequency):
-    label_signal = np.asarray(label_signal)
-    output_signal = np.asarray(output_signal)
+def compute_weighted_absolute_difference(x_ref, x_est, sampling_frequency, keep_nans=True):
+    # Check the reference and estimated signals.
+    x_ref = np.asarray(x_ref).copy()
+    x_est = np.asarray(x_est).copy()
+    assert(x_ref.ndim == x_est.ndim == 1)
 
-    assert(label_signal.ndim == output_signal.ndim == 1)
-    assert(np.size(label_signal) == np.size(output_signal))
+    # Pad the shorter signal with NaNs so that both signals have the same length.
+    n_ref = np.size(x_ref)
+    n_est = np.size(x_est)
+    if n_est < n_ref:
+        x_est = np.concatenate((x_est, np.nan*np.ones(n_ref - n_est)))
+    elif n_est > n_ref:
+        x_ref = np.concatenate((x_ref, np.nan*np.ones(n_est - n_ref)))
 
-    idx_finite_signal = np.isfinite(label_signal)
-    label_signal = label_signal[idx_finite_signal]
-    output_signal = output_signal[idx_finite_signal]
+    # Identify the samples with finite values, i.e., not NaN, +\infty, or -\infty.
+    idx_ref = np.isfinite(x_ref)
+    idx_est = np.isfinite(x_est) 
 
-    idx_nan_signal = np.isnan(output_signal)
-    output_signal[idx_nan_signal] = 0
+    # Either only consider samples with finite values in both signals (default) or replace the non-finite values in the estimated signal with zeros.
+    if keep_nans:
+        idx = np.logical_and(idx_ref, idx_est)
+    else:
+        x_est[~idx_est] = 0
+        idx = idx_ref
 
+    x_ref = x_ref[idx]
+    x_est = x_est[idx]
+
+    # Filter the reference signal and compute a weighted absolute difference metric between the signals.
     from scipy.signal import filtfilt
 
     m = round(0.1 * sampling_frequency)
-    w = filtfilt(np.ones(m), m, label_signal, method='gust')
+    w = filtfilt(np.ones(m), m, x_ref, method='gust')
     w = 1 - 0.5/np.max(w) * w
     n = np.sum(w)
 
-    weighted_absolute_difference_metric = np.sum(np.abs(label_signal-output_signal) * w)/n
+    weighted_absolute_difference_metric = np.sum(np.abs(x_ref - x_est) * w)/n
 
     return weighted_absolute_difference_metric
 
