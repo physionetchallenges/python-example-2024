@@ -534,8 +534,6 @@ def compute_snr(x_ref, x_est, keep_nans=True, signal_median=False, noise_median=
     # Compute the SNR.
     if p_signal > 0 and p_noise > 0:
         snr = 10 * np.log10(p_signal / p_noise)
-    elif p_noise == 0:
-        snr = float('inf')
     else:
         snr = float('nan')
 
