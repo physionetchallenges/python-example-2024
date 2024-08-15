@@ -505,7 +505,7 @@ def compute_snr(x_ref, x_est, keep_nans=True, signal_median=False, noise_median=
 
     # Identify the samples with finite values, i.e., not NaN, +\infty, or -\infty.
     idx_ref = np.isfinite(x_ref)
-    idx_est = np.isfinite(x_est) 
+    idx_est = np.isfinite(x_est)
 
     # Either only consider samples with finite values in both signals (default) or replace the non-finite values in the estimated signal with zeros.
     if keep_nans:
@@ -513,27 +513,35 @@ def compute_snr(x_ref, x_est, keep_nans=True, signal_median=False, noise_median=
     else:
         x_est[~idx_est] = 0
         idx = idx_ref
-
+    
     x_ref = x_ref[idx]
     x_est = x_est[idx]
-
+    
     # Compute the noise.
     x_noise = x_ref - x_est
 
     # Compute the power for the signal and the noise using either the mean (default) or the median.
-    if not signal_median:
-        p_signal = np.mean(x_ref**2)
+    if np.any(np.isfinite(x_ref)):        
+        if not signal_median:
+            p_signal = np.nanmean(x_ref**2)
+        else:
+            p_signal = np.nanmedian(x_ref**2)
     else:
-        p_signal = np.median(x_ref**2)
-
-    if not noise_median:
-        p_noise = np.mean(x_noise**2)
+        p_signal = float('nan')
+    
+    if np.any(np.isfinite(x_noise)):
+        if not noise_median:
+            p_noise = np.nanmean(x_noise**2)
+        else:
+            p_noise = np.nanmedian(x_noise**2)
     else:
-        p_noise = np.median(x_noise**2)
-
-    # Compute the SNR.
+        p_noise = float('nan')
+        
+    # Compute the SNR, including for two edge cases with no digitized signal and perfect reconstruction of the reference signal.
     if p_signal > 0 and p_noise > 0:
         snr = 10 * np.log10(p_signal / p_noise)
+    elif np.sum(idx) == 0 and np.sum(idx_ref) > 0:
+        snr = 0
     else:
         snr = float('nan')
 
