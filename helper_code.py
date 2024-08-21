@@ -172,15 +172,21 @@ def get_header_file(record):
 # Get the signal files for a record.
 def get_signal_files(record):
     header_file = get_header_file(record)
-    header = load_text(header_file)
-    signal_files = get_signal_files_from_header(header)
+    if os.path.isfile(header_file):
+        header = load_text(header_file)
+        signal_files = get_signal_files_from_header(header)
+    else:
+        signal_files = list()
     return signal_files
 
 # Get the image files for a record.
 def get_image_files(record):
     header_file = get_header_file(record)
-    header = load_text(header_file)
-    image_files = get_image_files_from_header(header)
+    if os.path.isfile(header_file):
+        header = load_text(header_file)
+        image_files = get_image_files_from_header(header)
+    else:
+        image_files = list()
     return image_files
 
 ### WFDB functions
@@ -453,39 +459,44 @@ def align_signals(x_ref, x_est, num_quant_levels, smooth=True, sigma=0.5):
     # in noisy conditions.
     # Reza Sameni, Zuzana Koscova, Matthew Reyna, July 2024
 
-    # Summarize the durations and amplitudes of the signals.
-    min_amp = min(np.nanmin(x_ref), np.nanmin(x_est))
-    max_amp = max(np.nanmax(x_ref), np.nanmax(x_est))
-    max_t = max(np.size(x_ref), np.size(x_est))
+    if np.any(np.isfinite(x_ref)) and np.any(np.isfinite(x_est)):
+        # Summarize the durations and amplitudes of the signals.
+        min_amp = min(np.nanmin(x_ref), np.nanmin(x_est))
+        max_amp = max(np.nanmax(x_ref), np.nanmax(x_est))
+        max_t = max(np.size(x_ref), np.size(x_est))
 
-    # Quantize the 1D signal amplitudes to convert the 1D real-valued signals to 2D binarized signals.
-    A_ref = convert_signal(x_ref, num_quant_levels, min_amp, max_amp, max_t)
-    A_est = convert_signal(x_est, num_quant_levels, min_amp, max_amp, max_t)
+        # Quantize the 1D signal amplitudes to convert the 1D real-valued signals to 2D binarized signals.
+        A_ref = convert_signal(x_ref, num_quant_levels, min_amp, max_amp, max_t)
+        A_est = convert_signal(x_est, num_quant_levels, min_amp, max_amp, max_t)
 
-    # Apply Gaussian smoothing to the 2D binarized signals (optional).
-    if smooth:
-        A_ref = gaussian_filter(A_ref, sigma)
-        A_est = gaussian_filter(A_est, sigma)
+        # Apply Gaussian smoothing to the 2D binarized signals (optional).
+        if smooth:
+            A_ref = gaussian_filter(A_ref, sigma)
+            A_est = gaussian_filter(A_est, sigma)
+        
+        # Compute the cross-correlation of 2D reference and estimated signals in the spectral domain.
+        A_cross = fft_correlate(A_ref, A_est)
+        idx_cross = np.unravel_index(np.argmax(A_cross), A_cross.shape)
+                                    
+        # Compute the auto-correlation of the reference signal in the spectral domain.
+        A_auto = fft_correlate(A_ref, A_ref)
+        idx_auto = np.unravel_index(np.argmax(A_auto), A_auto.shape)
     
-    # Compute the cross-correlation of 2D reference and estimated signals in the spectral domain.
-    A_cross = fft_correlate(A_ref, A_est)
-    idx_cross = np.unravel_index(np.argmax(A_cross), A_cross.shape)
-                                 
-    # Compute the auto-correlation of the reference signal in the spectral domain.
-    A_auto = fft_correlate(A_ref, A_ref)
-    idx_auto = np.unravel_index(np.argmax(A_auto), A_auto.shape)
-   
-    # Estimate vertical and horizontal offsets from the cross-correlation peak lags.
-    offset_hz = idx_auto[1] - idx_cross[1]
-    offset_vt = idx_auto[0] - idx_cross[0]
-    offset_vt = offset_vt / (num_quant_levels - 1) * (max_amp - min_amp)
+        # Estimate vertical and horizontal offsets from the cross-correlation peak lags.
+        offset_hz = idx_auto[1] - idx_cross[1]
+        offset_vt = idx_auto[0] - idx_cross[0]
+        offset_vt = offset_vt / (num_quant_levels - 1) * (max_amp - min_amp)
 
-    # Shift the estimated signal by the estimated offsets.
-    if offset_hz < 0:
-        x_est_shifted = np.concatenate((np.nan*np.ones(-offset_hz), x_est))
+        # Shift the estimated signal by the estimated offsets.
+        if offset_hz < 0:
+            x_est_shifted = np.concatenate((np.nan*np.ones(-offset_hz), x_est))
+        else:
+            x_est_shifted = np.concatenate((x_est[offset_hz:], np.nan*np.ones(offset_hz)))
+        x_est_shifted -= offset_vt
     else:
-        x_est_shifted = np.concatenate((x_est[offset_hz:], np.nan*np.ones(offset_hz)))
-    x_est_shifted -= offset_vt
+        x_est_shifted = x_est.copy()
+        offset_hz = 0
+        offset_vt = 0
 
     return x_est_shifted, offset_hz, offset_vt
 
