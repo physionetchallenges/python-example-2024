@@ -489,7 +489,7 @@ def align_signals(x_ref, x_est, num_quant_levels, smooth=True, sigma=0.5):
 
         # Shift the estimated signal by the estimated offsets.
         if offset_hz < 0:
-            x_est_shifted = np.concatenate((np.nan*np.ones(-offset_hz), x_est))
+            x_est_shifted = np.concatenate((np.nan*np.ones(-offset_hz), x_est[:-offset_hz]))
         else:
             x_est_shifted = np.concatenate((x_est[offset_hz:], np.nan*np.ones(offset_hz)))
         x_est_shifted -= offset_vt
